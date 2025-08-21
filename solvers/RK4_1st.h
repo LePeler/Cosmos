@@ -18,18 +18,6 @@ public:
     // destructor
     ~RK4_1st() = default;
 
-    // compute a step of the solving algorithm
-    double ComputeStep(double dt) const;
-
-    // make a step of the solving algorithm
-    void MakeStep(double dt) {
-        t += dt;
-        times.push_back(t);
-
-        y = ComputeStep(dt);
-        values.push_back(y);
-    }
-
     // get the last time
     double GetCurrentTime() const {
         return t;
@@ -48,6 +36,32 @@ public:
     // get all computed values
     std::vector<double> GetValues() const {
         return values;
+    }
+
+    // compute a step of the solving algorithm
+    double ComputeStep(double dt) const;
+
+    // make a step of the solving algorithm
+    void MakeStep(double dt) {
+        t += dt;
+        times.push_back(t);
+
+        y = ComputeStep(dt);
+        values.push_back(y);
+    }
+
+    // call a loop over MakeStep for N steps at a fixed width
+    void MakeSteps(double dt, unsigned int N) {
+        for (unsigned int n = 0; n < N; n++) {
+            MakeStep(dt);
+        }
+    }
+
+    // call a loop over MakeStep for a vector of widths
+    void MakeStepsVector(const std::vector<double> &dts) {
+        for (double dt : dts) {
+            MakeStep(dt);
+        }
     }
 
 
