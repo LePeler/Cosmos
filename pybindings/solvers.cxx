@@ -25,7 +25,7 @@ PYBIND11_MODULE(cosmos, module) {
         .def("steps", &RK4_1st::MakeSteps,
             py::arg("dt"), py::arg("N"), "have the solver make N steps of width dt")
         .def("steps_vector", &RK4_1st::MakeStepsVector,
-            py::arg("dts"), "have the solver make steps for the widths dts");
+            py::arg("dT"), "have the solver make steps for the widths in dT");
 
 };
 

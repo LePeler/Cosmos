@@ -11,8 +11,8 @@ public:
         func = f;
         y = y0;
         t = t0;
-        times.push_back(t);
-        values.push_back(y);
+        T.push_back(t);
+        Y.push_back(y);
     }
 
     // destructor
@@ -30,12 +30,12 @@ public:
 
     // get all times
     std::vector<double> GetTimes() const {
-        return times;
+        return T;
     }
 
     // get all computed values
     std::vector<double> GetValues() const {
-        return values;
+        return Y;
     }
 
     // compute a step of the solving algorithm
@@ -44,10 +44,10 @@ public:
     // make a step of the solving algorithm
     void MakeStep(double dt) {
         t += dt;
-        times.push_back(t);
+        T.push_back(t);
 
         y = ComputeStep(dt);
-        values.push_back(y);
+        Y.push_back(y);
     }
 
     // call a loop over MakeStep for N steps at a fixed width
@@ -58,8 +58,8 @@ public:
     }
 
     // call a loop over MakeStep for a vector of widths
-    void MakeStepsVector(const std::vector<double> &dts) {
-        for (double dt : dts) {
+    void MakeStepsVector(const std::vector<double> &dT) {
+        for (double dt : dT) {
             MakeStep(dt);
         }
     }
@@ -70,9 +70,9 @@ private:
     std::function<double(double, double)> func;
 
     // vector that stores the times for which values were calculated
-    std::vector<double> times;
+    std::vector<double> T;
     // vector that stores the computed values
-    std::vector<double> values;
+    std::vector<double> Y;
 
     // current time
     double t;
