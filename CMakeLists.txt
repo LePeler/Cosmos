@@ -39,4 +39,10 @@ add_executable(LCDM
 target_link_libraries(LCDM PRIVATE
     solvers)
 
+# executable to simulate quintessence
+add_executable(quintessence
+    models/quintessence.cxx
+)
+target_link_libraries(quintessence PRIVATE
+    solvers)
 

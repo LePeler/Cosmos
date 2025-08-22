@@ -6,14 +6,14 @@
 #include <solvers/RK4.h>
 
 
-double tau = 3.08e19; // s
+// tau = 3.08e19 s
 
 double H0 = 69; // 1/tau
 double OmM0 = 0.3;
 double OmR0 = 5e-5;
 double OmL0 = 1 - OmM0 - OmR0;
 
-double dt = 1e-9;
+double dt = 1e-10;
 unsigned int K = 2e8;
 
 std::array<double, 1> LCDM(const std::array<double, 1> &a, double t) {
@@ -29,12 +29,17 @@ int main(int argc, char* argv[]) {
 
     DotProgressBar progress_bar(K, "step(s)", int(K/100), 70);
     for (unsigned int k = 0; k < K; k++) {
-        solver.MakeStep(dt);
+        solver.MakeStep(-dt);
         progress_bar.step();
+
+        if (std::isnan(solver.GetCurrentValue()[0])) {
+            std::cout << "Big Bang reached! Solving stopped." << std::endl;
+            break;
+        }
     }
 
-    save_vector_as_txt(solver.GetTimes(), "/home/aurora/sim_results/LCDM_times.txt");
-    save_arrayvector_as_txt(solver.GetValues(), "/home/aurora/sim_results/LCDM_values.txt");
+    save_vector_as_txt(solver.GetTimes(), "/home/aurora/sim_results/LCDM_times.txt", 10);
+    save_arrayvector_as_txt(solver.GetValues(), "/home/aurora/sim_results/LCDM_values.txt", 10);
 }
 
 
