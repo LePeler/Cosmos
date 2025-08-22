@@ -1,22 +1,25 @@
 #include <vector>
 #include <functional>
 
+#include <State.h>
+
 
 // 4th order Runge Kutta solver for 1st order differential equations
-class RK4_1st {
+template<unsigned short N>
+class RK4 {
 
 public:
     // constructor
-    RK4_1st(std::function<double(double, double)> f, double y0, double t0) {
+    RK4(std::function<State<N>(State<N>, double)> f, State<N> y0, double t0) {
         func = f;
         y = y0;
         t = t0;
-        T.push_back(t);
         Y.push_back(y);
+        T.push_back(t);
     }
 
     // destructor
-    ~RK4_1st() = default;
+    ~RK4() = default;
 
     // get the last time
     double GetCurrentTime() const {
@@ -24,7 +27,7 @@ public:
     }
 
     // get the last computed value
-    double GetCurrentValue() const {
+    std::array<double, N> GetCurrentValue() const {
         return y;
     }
 
@@ -34,12 +37,13 @@ public:
     }
 
     // get all computed values
-    std::vector<double> GetValues() const {
-        return Y;
+    std::vector<std::array<double, N>> GetValues() const {
+        std::vector<std::array<double, N>> result;
+        for (State<N> val : Y) {
+            result.push_back(val);
+        }
+        return result;
     }
-
-    // compute a step of the solving algorithm
-    double ComputeStep(double dt) const;
 
     // make a step of the solving algorithm
     void MakeStep(double dt) {
@@ -50,9 +54,9 @@ public:
         Y.push_back(y);
     }
 
-    // call a loop over MakeStep for N steps at a fixed width
-    void MakeSteps(double dt, unsigned int N) {
-        for (unsigned int n = 0; n < N; n++) {
+    // call a loop over MakeStep for K steps at a fixed width
+    void MakeSteps(double dt, unsigned int K) {
+        for (unsigned int k = 0; k < K; k++) {
             MakeStep(dt);
         }
     }
@@ -67,17 +71,20 @@ public:
 
 private:
     // function that gives y'(y, t)
-    std::function<double(double, double)> func;
+    std::function<State<N>(State<N>, double)> func;
 
     // vector that stores the times for which values were calculated
     std::vector<double> T;
     // vector that stores the computed values
-    std::vector<double> Y;
+    std::vector<State<N>> Y;
 
     // current time
     double t;
     // current value
-    double y;
+    State<N> y;
+
+    // compute a step of the solving algorithm
+    State<N> ComputeStep(double dt) const;
 };
 
 

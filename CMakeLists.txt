@@ -12,7 +12,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 
 # solver library
 add_library(solvers
-    solvers/RK4_1st.cxx)
+    solvers/RK4.cxx)
 
 set_target_properties(solvers PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
