@@ -5,7 +5,7 @@
 
 
 // 4th order Runge Kutta solver for 1st order differential equations
-template<unsigned short N>
+template<size_t N>
 class RK4 {
 
 public:

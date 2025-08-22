@@ -32,4 +32,11 @@ add_custom_command(TARGET cosmos POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:cosmos> ${target_output_dir}/__init__.so
 )
 
+# executable to simulate LCDM
+add_executable(LCDM
+    models/LCDM.cxx
+)
+target_link_libraries(LCDM PRIVATE
+    solvers)
+
 

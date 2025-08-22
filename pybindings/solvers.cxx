@@ -8,7 +8,7 @@
 
 namespace py = pybind11;
 
-template<unsigned short N>
+template<size_t N>
 void bind_RK4(py::module_ m) {
     py::class_<RK4<N>>(m, ("RK4_" + std::to_string(N) + "dim").c_str(), ("An RK4 solver for 1st order differential equations with " + std::to_string(N) + "-dimensional variable space").c_str())
         .def(py::init<std::function<std::array<double, N>(std::array<double, N>, double)>, std::array<double, N>, double>(),

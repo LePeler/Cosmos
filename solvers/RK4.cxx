@@ -6,7 +6,7 @@ template class RK4<3>;
 template class RK4<4>;
 template class RK4<5>;
 
-template<unsigned short N>
+template<size_t N>
 State<N> RK4<N>::ComputeStep(double dt) const {
     // make an RK4 step
 
