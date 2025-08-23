@@ -10,7 +10,7 @@ class RK4 {
 
 public:
     // constructor
-    RK4(std::function<State<N>(State<N>, double)> func, State<N> y0, double t0)
+    RK4(std::function<State<N>(const State<N> &, double)> func, State<N> y0, double t0)
         :
         func_(func),
         y_(y0),
@@ -73,7 +73,7 @@ public:
 
 private:
     // function that gives y'(y, t)
-    std::function<State<N>(State<N>, double)> func_;
+    std::function<State<N>(const State<N> &, double)> func_;
 
     // vector that stores the times for which values were calculated
     std::vector<double> T_;
@@ -85,8 +85,17 @@ private:
     // current value
     State<N> y_;
 
-    // compute a step of the solving algorithm
-    State<N> ComputeStep(double dt) const;
+    // compute a step of the RK4 solving algorithm
+    State<N> ComputeStep(double dt) const {
+
+        State<N> k1 = func_(y_, t_);
+        State<N> k2 = func_(y_ + k1*dt/2, t_ + dt/2);
+        State<N> k3 = func_(y_ + k2*dt/2, t_ + dt/2);
+        State<N> k4 = func_(y_ + k3*dt, t_ + dt);
+
+        return y_ + (k1 + k2*2 + k3*2 + k4)/6 * dt;
+    }
+
 };
 
 

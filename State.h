@@ -23,6 +23,16 @@ struct State {
         return values;
     }
 
+    // fast (but unsafe) element access
+    double operator[](size_t n) const {
+        return values[n];
+    }
+
+    // safe element access
+    double at(size_t n) const {
+        return values.at(n);
+    }
+
     // element-wise addition
     State<N> operator+(const State<N> &rhs) const {
         State<N> result;

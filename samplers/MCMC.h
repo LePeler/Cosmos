@@ -11,7 +11,7 @@ class MCMC {
 
 public:
     // constructor
-    MCMC(std::function<double(State<N>)> lnP, std::array<State<N>, W> init_states, double alpha, double beta = 2)
+    MCMC(std::function<double(const State<N> &)> lnP, std::array<State<N>, W> init_states, double alpha, double beta = 2)
         :
         lnP_(lnP),
         states_(init_states),
@@ -47,7 +47,7 @@ public:
     void MakeIter() {
         states_ = ComputeIter();
 
-        sample_.insert(states_.begin(), states_.end(), sample_.end());
+        sample_.insert(sample_.end(), states_.begin(), states_.end());
     }
 
     // call a loop over MakeIter for K steps
@@ -60,7 +60,7 @@ public:
 
 private:
     // log-likelyhood function
-    std::function<double(State<N>)> lnP_;
+    std::function<double(const State<N> &)> lnP_;
 
     // current states of the walkers
     std::array<State<N>, W> states_;
@@ -82,12 +82,60 @@ private:
     std::uniform_int_distribution<size_t> dist0W2_;
 
     // pdf for the stretch factor
-    double StretchP(double stretch) const;
+    double StretchP(double stretch) const {
+        return sqrt(beta_/stretch)/2/(beta_-1);
+    }
+
     // sample the stretch factor from above pdf
-    double SampleStretch();
+    double SampleStretch() {
+        double rand01 = dist01_(randgen_);
+
+        return ((beta_-1)*rand01 + 1) * ((beta_-1)*rand01 + 1) /beta_;
+    }
 
     // compute an iteration of the MCMC algorithm
-    std::array<State<N>, W> ComputeIter();
+    std::array<State<N>, W> ComputeIter() {
+
+        // sample new states
+        std::array<State<N>, W> new_states;
+        std::array<double, W> move_prob;
+        for (size_t w = 0; w < W; w++) {
+            size_t idx = dist0W2_(randgen_);
+            if (idx >= w) {
+                idx++;
+            }
+
+            double stretch = SampleStretch();
+            move_prob[w] = 1/(W-1) * StretchP(stretch);
+
+            new_states[w] = states_[w] + (states_[idx] - states_[w]) * stretch;
+        }
+
+        // calculate logprobs
+        std::array<double, W> new_logprobs;
+        for (size_t w = 0; w < W; w++) {
+            new_logprobs[w] = lnP_(new_states[w]);
+        }
+
+        // calculate acceptance probabilities
+        std::array<double, W> acceptance_probs;
+        for (size_t w = 0; w < W; w++) {
+            acceptance_probs[w] = alpha_/move_prob[w] * exp((new_logprobs[w] - logprobs_[w])/2);
+        }
+
+        // accept or reject
+        std::array<State<N>, W> result = states_;
+        double rand01;
+        for (size_t w = 0; w < W; w++) {
+            rand01 = dist01_(randgen_);
+            if (rand01 < acceptance_probs[w]) {
+                result[w] = new_states[w];
+            }
+        }
+
+        return result;
+    }
+
 };
 
 
