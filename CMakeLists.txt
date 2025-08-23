@@ -10,19 +10,19 @@ find_package(pybind11 CONFIG REQUIRED)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
-# solver library
-add_library(solvers
-    solvers/RK4.cxx)
-
-set_target_properties(solvers PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# library for everything
+add_library(cosmos_all
+    solvers/RK4.cxx
+    samplers/MCMC.cxx
+)
+set_target_properties(cosmos_all PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # python module
 pybind11_add_module(cosmos
-    pybindings/solvers.cxx)
-
-# linking
-target_link_libraries(cosmos PRIVATE
-    solvers)
+    pybindings/solvers.cxx
+    pybindings/samplers.cxx
+)
+target_link_libraries(cosmos PRIVATE cosmos_all)
 
 
 # copy .so to cosmos folder for Python access
@@ -36,13 +36,11 @@ add_custom_command(TARGET cosmos POST_BUILD
 add_executable(LCDM
     models/LCDM.cxx
 )
-target_link_libraries(LCDM PRIVATE
-    solvers)
+target_link_libraries(LCDM PRIVATE cosmos_all)
 
 # executable to simulate quintessence
 add_executable(quintessence
     models/quintessence.cxx
 )
-target_link_libraries(quintessence PRIVATE
-    solvers)
+target_link_libraries(quintessence PRIVATE cosmos_all)
 

@@ -10,12 +10,14 @@ class RK4 {
 
 public:
     // constructor
-    RK4(std::function<State<N>(State<N>, double)> f, State<N> y0, double t0) {
-        func = f;
-        y = y0;
-        t = t0;
-        Y.push_back(y);
-        T.push_back(t);
+    RK4(std::function<State<N>(State<N>, double)> func, State<N> y0, double t0)
+        :
+        func_(func),
+        y_(y0),
+        t_(t0)
+    {
+        Y_.push_back(y_);
+        T_.push_back(t_);
     }
 
     // destructor
@@ -23,23 +25,23 @@ public:
 
     // get the last time
     double GetCurrentTime() const {
-        return t;
+        return t_;
     }
 
     // get the last computed value
     std::array<double, N> GetCurrentValue() const {
-        return y;
+        return y_;
     }
 
     // get all times
     std::vector<double> GetTimes() const {
-        return T;
+        return T_;
     }
 
     // get all computed values
     std::vector<std::array<double, N>> GetValues() const {
         std::vector<std::array<double, N>> result;
-        for (State<N> val : Y) {
+        for (State<N> val : Y_) {
             result.push_back(val);
         }
         return result;
@@ -47,11 +49,11 @@ public:
 
     // make a step of the solving algorithm
     void MakeStep(double dt) {
-        t += dt;
-        T.push_back(t);
+        t_ += dt;
+        T_.push_back(t_);
 
-        y = ComputeStep(dt);
-        Y.push_back(y);
+        y_ = ComputeStep(dt);
+        Y_.push_back(y_);
     }
 
     // call a loop over MakeStep for K steps at a fixed width
@@ -71,17 +73,17 @@ public:
 
 private:
     // function that gives y'(y, t)
-    std::function<State<N>(State<N>, double)> func;
+    std::function<State<N>(State<N>, double)> func_;
 
     // vector that stores the times for which values were calculated
-    std::vector<double> T;
+    std::vector<double> T_;
     // vector that stores the computed values
-    std::vector<State<N>> Y;
+    std::vector<State<N>> Y_;
 
     // current time
-    double t;
+    double t_;
     // current value
-    State<N> y;
+    State<N> y_;
 
     // compute a step of the solving algorithm
     State<N> ComputeStep(double dt) const;
