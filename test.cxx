@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
 
 
 
-    MCMC<1, 10> sampler(log_gauss, init_states, 0.04);
+    MCMC<1, 10> sampler(log_gauss, init_states, 0.04, "/home/aurora/sim_results/MCMC_test.txt");
 
     unsigned int K = 1000000;
     DotProgressBar progress_bar(K, "iter(s)", int(K/100), 70);
@@ -48,13 +48,12 @@ int main(int argc, char* argv[]) {
     for (unsigned int k = 0; k < K; k++) {
         sampler.MakeIter();
         progress_bar.step();
+        std::cout << "mean = " << sampler.GetStateMean() << std::endl;
+        std::cout << "variance = " << sampler.GetStateVariance() << std::endl;
+        std::cout << std::endl;
     }
 
     std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
-
-    std::vector<Vector<1>> sample = sampler.GetSample();
-
-    save_vector_as_txt(sample, "/home/aurora/sim_results/MCMC_test.txt");
 
 }
 
