@@ -16,8 +16,8 @@ double OmL0 = 1 - OmM0 - OmR0;
 double dt = 1e-10;
 unsigned int K = 2e8;
 
-std::array<double, 1> LCDM(const std::array<double, 1> &a, double t) {
-    std::array<double, 1> result;
+Vector<1> LCDM(const Vector<1> &a, double t) {
+    Vector<1> result;
     result[0] = H0 * sqrt(OmM0/a[0] + OmR0/a[0]/a[0] + OmL0*a[0]*a[0]);
     return result;
 }
@@ -25,7 +25,7 @@ std::array<double, 1> LCDM(const std::array<double, 1> &a, double t) {
 
 int main(int argc, char* argv[]) {
 
-    RK4<1> solver(LCDM, {1}, 0);
+    RK4<1> solver(LCDM, Vector<1>{1}, 0);
 
     DotProgressBar progress_bar(K, "step(s)", int(K/100), 70);
     for (unsigned int k = 0; k < K; k++) {
@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
     }
 
     save_vector_as_txt(solver.GetTimes(), "/home/aurora/sim_results/LCDM_times.txt", 10);
-    save_arrayvector_as_txt(solver.GetValues(), "/home/aurora/sim_results/LCDM_values.txt", 10);
+    save_vector_as_txt(solver.GetValues(), "/home/aurora/sim_results/LCDM_values.txt", 10);
 }
 
 

@@ -2,16 +2,20 @@
 #include <functional>
 #include <random>
 
-#include <State.h>
+#include <utils.h>
+
+
+#ifndef MCMC_H_INCLUDED
+#define MCMC_H_INCLUDED
 
 
 // affine invariant MCMC sampler
-template<size_t N, size_t W>
+template<int N, unsigned int W>
 class MCMC {
 
 public:
     // constructor
-    MCMC(std::function<double(const State<N> &)> lnP, std::array<State<N>, W> init_states, double alpha, double beta = 2)
+    MCMC(std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha, double beta = 2)
         :
         lnP_(lnP),
         states_(init_states),
@@ -26,22 +30,68 @@ public:
     ~MCMC() = default;
 
     // get the current walker states
-    std::array<std::array<double, N>, W> GetWalkerStates() const {
-        std::array<std::array<double, N>, W> result;
-        for (size_t w = 0; w < W; w++) {
+    std::array<Vector<N>, W> GetWalkerStates() const {
+        std::array<Vector<N>, W> result;
+        for (unsigned int w = 0; w < W; w++) {
             result[w] = states_[w];
         }
         return result;
     }
 
     // get the entire sample
-    std::vector<std::array<double, N>> GetSample() const {
-        std::vector<std::array<double, N>> result;
-        for (State<N> state : sample_) {
-            result.push_back(state);
+    std::vector<Vector<N>> GetSample() const {
+        return sample_;
+    }
+
+    // get the sample mean
+    Vector<N> GetSampleMean() const {
+        Vector<N> result;
+        for (const Vector<N> &state : sample_) {
+            result += state;
         }
+        result /= sample_.size();
+
         return result;
     }
+
+    // get the sample scalar variance (the trace of the covariance matrix)
+    double GetSampleVariance() const {
+        double result = 0;
+        Vector<N> mean = GetSampleMean();
+        for (const Vector<N> &state : sample_) {
+            result += (state-mean)*(state-mean);
+        }
+        result /= sample_.size();
+
+        return result;
+    }
+
+    // get the sample scalar covariance (the element sum of the covariance matrix)
+    double GetSampleCovariance() const {
+        double result = 0;
+        Vector<N> mean = GetSampleMean();
+        for (size_t j = 0; j < sample_.size(); j++) {
+            result += (sample_[j]-mean)*(sample_[j]-mean);
+            for (size_t k = 0; k < j; k++) {
+                result += 2*(sample_[j]-mean)*(sample_[k]-mean);
+            }
+        }
+        result /= sample_.size();
+
+        return result;
+    }
+
+    // get the effective number of samples (due to the sample covariance)
+    double GetEffectiveNumSamples() const {
+        return sample_.size() * GetSampleVariance()/GetSampleCovariance();
+
+    }
+
+    /*// get the fraction of new state samples that are accepted
+    double GetAcceptanceRate() const {
+        return num_accepted_/sample_.size();
+    }*/
+
 
     // make an iteration of the MCMC algorithm
     void MakeIter() {
@@ -60,14 +110,14 @@ public:
 
 private:
     // log-likelyhood function
-    std::function<double(const State<N> &)> lnP_;
+    std::function<double(const Vector<N> &)> lnP_;
 
     // current states of the walkers
-    std::array<State<N>, W> states_;
+    std::array<Vector<N>, W> states_;
     // logprobs at the current states
     std::array<double, W> logprobs_;
     // the entire sample
-    std::vector<State<N>> sample_;
+    std::vector<Vector<N>> sample_;
 
     // tuning constant for acceptance probabilities
     double alpha_;
@@ -94,12 +144,12 @@ private:
     }
 
     // compute an iteration of the MCMC algorithm
-    std::array<State<N>, W> ComputeIter() {
+    std::array<Vector<N>, W> ComputeIter() {
 
         // sample new states
-        std::array<State<N>, W> new_states;
+        std::array<Vector<N>, W> new_states;
         std::array<double, W> move_prob;
-        for (size_t w = 0; w < W; w++) {
+        for (unsigned int w = 0; w < W; w++) {
             size_t idx = dist0W2_(randgen_);
             if (idx >= w) {
                 idx++;
@@ -113,20 +163,20 @@ private:
 
         // calculate logprobs
         std::array<double, W> new_logprobs;
-        for (size_t w = 0; w < W; w++) {
+        for (unsigned int w = 0; w < W; w++) {
             new_logprobs[w] = lnP_(new_states[w]);
         }
 
         // calculate acceptance probabilities
         std::array<double, W> acceptance_probs;
-        for (size_t w = 0; w < W; w++) {
+        for (unsigned int w = 0; w < W; w++) {
             acceptance_probs[w] = alpha_/move_prob[w] * exp((new_logprobs[w] - logprobs_[w])/2);
         }
 
         // accept or reject
-        std::array<State<N>, W> result = states_;
+        std::array<Vector<N>, W> result = states_;
         double rand01;
-        for (size_t w = 0; w < W; w++) {
+        for (unsigned int w = 0; w < W; w++) {
             rand01 = dist01_(randgen_);
             if (rand01 < acceptance_probs[w]) {
                 result[w] = new_states[w];
@@ -138,4 +188,7 @@ private:
 
 };
 
+
+
+#endif //MCMC_H_INCLUDED
 

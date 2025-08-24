@@ -4,9 +4,20 @@
 #include <filesystem>
 #include <stdexcept>
 
+#include <Eigen/Dense>
 
-template<typename T>
-void save_vector_as_txt(const std::vector<T> &vec, std::filesystem::path path, unsigned int save_every = 1) {
+
+#ifndef UTILS_H_INCLUDED
+#define UTILS_H_INCLUDED
+
+
+template<int N>
+using Vector = Eigen::Matrix<double, N, 1>;
+template<int N>
+using Matrix = Eigen::Matrix<double, N, N>;
+
+
+void save_vector_as_txt(const std::vector<double> &vec, std::filesystem::path path, unsigned int save_every = 1) {
     // save a std::vector<T> as a .txt file, save only every skip values
 
     std::ofstream file(path);
@@ -22,9 +33,9 @@ void save_vector_as_txt(const std::vector<T> &vec, std::filesystem::path path, u
 }
 
 
-template<typename T, size_t N>
-void save_arrayvector_as_txt(const std::vector<std::array<T, N>> &vec, std::filesystem::path path, unsigned int save_every = 1) {
-    // save a std::vector<std::array<T, N>> as a .txt file, save only every skip values
+template<int N>
+void save_vector_as_txt(const std::vector<Vector<N>> &vec, std::filesystem::path path, unsigned int save_every = 1) {
+    // save a std::vector<Vector<N>> as a .txt file, save only every skip values
 
     std::ofstream file(path);
     if (!file) {
@@ -32,7 +43,7 @@ void save_arrayvector_as_txt(const std::vector<std::array<T, N>> &vec, std::file
     }
 
     for (size_t i = 0; i < vec.size()/save_every; i++) {
-        for (size_t n = 0; n < N-1; n++) {
+        for (int n = 0; n < N-1; n++) {
             file << vec[i*save_every][n] << ", ";
         }
         file << vec[i*save_every][N-1] << "\n";
@@ -41,4 +52,7 @@ void save_arrayvector_as_txt(const std::vector<std::array<T, N>> &vec, std::file
     file.close();
 }
 
+
+
+#endif //UTILS_H_INCLUDED
 

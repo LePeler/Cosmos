@@ -5,6 +5,10 @@
 #include <iomanip>
 
 
+#ifndef PROGRESSBAR_H_INCLUDED
+#define PROGRESSBAR_H_INCLUDED
+
+
 class DotProgressBar {
 
 public:
@@ -111,4 +115,7 @@ private:
     unsigned int _bar_length;
 };
 
+
+
+#endif //PROGRESSBAR_H_INCLUDED
 

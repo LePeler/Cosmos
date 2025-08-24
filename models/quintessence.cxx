@@ -18,8 +18,8 @@ double dt = 2e-10;
 unsigned int K = 2e8;
 
 // state = {a, phi, psi}
-std::array<double, 3> quintessence(const std::array<double, 3> &state, double t) {
-    std::array<double, 3> result;
+Vector<3> quintessence(const Vector<3> &state, double t) {
+    Vector<3> result;
     result[0] = H0 * sqrt(OmM0/state[0] + OmR0/state[0]/state[0] + state[0]*state[0]*(state[2]*state[2]/2 + V0*pow(state[1], n)));
     result[1] = state[2];
     result[2] = -3*result[0]/state[0]*state[2] - V0*pow(state[1], n);
@@ -29,7 +29,7 @@ std::array<double, 3> quintessence(const std::array<double, 3> &state, double t)
 
 int main(int argc, char* argv[]) {
 
-    RK4<3> solver(quintessence, {1, 1, 0}, 0);
+    RK4<3> solver(quintessence, Vector<3>{1, 1, 0}, 0);
 
     DotProgressBar progress_bar(K, "step(s)", int(K/100), 70);
     for (unsigned int k = 0; k < K; k++) {
@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
     }
 
     save_vector_as_txt(solver.GetTimes(), "/home/aurora/sim_results/quintessence_times.txt", 10);
-    save_arrayvector_as_txt(solver.GetValues(), "/home/aurora/sim_results/quintessence_values.txt", 10);
+    save_vector_as_txt(solver.GetValues(), "/home/aurora/sim_results/quintessence_values.txt", 10);
 }
 
 
