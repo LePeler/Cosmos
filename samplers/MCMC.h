@@ -99,11 +99,13 @@ public:
     // get the state covariance matrix
     Matrix<N> GetStateCovarianceMatrix() const {
         Matrix<N> result = Matrix<N>::Zero();
+        Matrix<N> temp;
         Vector<N> mean = GetStateMean();
         for (unsigned int w = 0; w < W; w++) {
-            result[w][w] = (states_[w]-mean)*(states_[w]-mean).transpose();
+            result = (states_[w]-mean)*(states_[w]-mean).transpose();
             for (unsigned int j = 0; j < w; j++) {
-                result += 2*(states_[w]-mean)*(states_[j]-mean).transpose();
+                temp = (states_[w]-mean)*(states_[j]-mean).transpose();
+                result += temp + temp.transpose();
             }
         }
         result /= W;
