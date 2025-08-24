@@ -84,7 +84,7 @@ public:
         return result;
     }
 
-    // get the state scalar variance (the trace of the covariance matrix)
+    // get the state variance matrix
     double GetStateVarianceMatrix() const {
         double result = 0;
         Vector<N> mean = GetStateMean();
