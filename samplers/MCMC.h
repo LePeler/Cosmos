@@ -37,12 +37,8 @@ public:
     ~MCMC() = default;
 
     // get the current walker states
-    std::array<Vector<N>, W> GetWalkerStates() const {
-        std::array<Vector<N>, W> result;
-        for (unsigned int w = 0; w < W; w++) {
-            result[w] = states_[w];
-        }
-        return result;
+    std::array<Vector<N>, W> GetStates() const {
+        return states_;
     }
 
     // get the entire sample
@@ -50,9 +46,75 @@ public:
         return sample_;
     }
 
+    // get the state mean
+    Vector<N> GetStateMean() const {
+        Vector<N> result = Vector<N>::Zero();
+        for (unsigned int w = 0; w < W; w++) {
+            result += states_[w];
+        }
+        result /= W;
+
+        return result;
+    }
+
+    // get the state scalar variance (the trace of the variance matrix)
+    double GetStateVariance() const {
+        double result = 0;
+        Vector<N> mean = GetStateMean();
+        for (unsigned int w = 0; w < W; w++) {
+            result += (states_[w]-mean).dot(states_[w]-mean);
+        }
+        result /= W;
+
+        return result;
+    }
+
+    // get the state scalar covariance (the trace of the covariance matrix)
+    double GetStateCovariance() const {
+        double result = 0;
+        Vector<N> mean = GetStateMean();
+        for (unsigned int w = 0; w < W; w++) {
+            result += (states_[w]-mean).dot(states_[w]-mean);
+            for (unsigned int j = 0; j < w; j++) {
+                result += 2*(states_[w]-mean).dot(states_[j]-mean);
+            }
+        }
+        result /= W;
+
+        return result;
+    }
+
+    // get the state scalar variance (the trace of the covariance matrix)
+    double GetStateVarianceMatrix() const {
+        double result = 0;
+        Vector<N> mean = GetStateMean();
+        for (unsigned int w = 0; w < W; w++) {
+            result += (states_[w]-mean)*(states_[w]-mean).transpose();
+        }
+        result /= W;
+
+        return result;
+    }
+
+    // get the state covariance matrix
+    Matrix<N> GetStateCovarianceMatrix() const {
+        Matrix<N> result = Matrix<N>::Zero();
+        Vector<N> mean = GetStateMean();
+        for (unsigned int w = 0; w < W; w++) {
+            result[w][w] = (states_[w]-mean)*(states_[w]-mean).transpose();
+            for (unsigned int j = 0; j < w; j++) {
+                result += 2*(states_[w]-mean)*(states_[j]-mean).transpose();
+            }
+        }
+        result /= W;
+
+        return result;
+    }
+
+
     // get the sample mean
     Vector<N> GetSampleMean() const {
-        Vector<N> result;
+        Vector<N> result = Vector<N>::Zero();
         for (const Vector<N> &state : sample_) {
             result += state;
         }
@@ -66,7 +128,7 @@ public:
         double result = 0;
         Vector<N> mean = GetSampleMean();
         for (const Vector<N> &state : sample_) {
-            result += (state-mean)*(state-mean);
+            result += (state-mean).dot(state-mean);
         }
         result /= sample_.size();
 
@@ -78,9 +140,9 @@ public:
         double result = 0;
         Vector<N> mean = GetSampleMean();
         for (size_t j = 0; j < sample_.size(); j++) {
-            result += (sample_[j]-mean)*(sample_[j]-mean);
+            result += (sample_[j]-mean).dot(sample_[j]-mean);
             for (size_t k = 0; k < j; k++) {
-                result += 2*(sample_[j]-mean)*(sample_[k]-mean);
+                result += 2*(sample_[j]-mean).dot(sample_[k]-mean);
             }
         }
         result /= sample_.size();
