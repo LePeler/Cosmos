@@ -2,6 +2,8 @@
 #include <functional>
 #include <random>
 
+#include <omp.h>
+
 #include <utils.h>
 
 
@@ -19,12 +21,17 @@ public:
         :
         lnP_(lnP),
         states_(init_states),
+        num_accepted_(0),
         alpha_(alpha),
         beta_(beta),
-        randgen_(std::random_device{}()),
         dist01_(0.0, 1.0),
         dist0W2_(0, W-2)
-    {}
+    {
+        // calculate initial logprobs
+        for (unsigned int w = 0; w < W; w++) {
+            logprobs_[w] = lnP_(states_[w]);
+        }
+    }
 
     // destructor
     ~MCMC() = default;
@@ -87,15 +94,15 @@ public:
 
     }
 
-    /*// get the fraction of new state samples that are accepted
+    // get the fraction of new state samples that are accepted
     double GetAcceptanceRate() const {
-        return num_accepted_/sample_.size();
-    }*/
+        return double(num_accepted_)/sample_.size();
+    }
 
 
     // make an iteration of the MCMC algorithm
     void MakeIter() {
-        states_ = ComputeIter();
+        ComputeIter();
 
         sample_.insert(sample_.end(), states_.begin(), states_.end());
     }
@@ -118,14 +125,14 @@ private:
     std::array<double, W> logprobs_;
     // the entire sample
     std::vector<Vector<N>> sample_;
+    // number of accepted new states
+    size_t num_accepted_;
 
     // tuning constant for acceptance probabilities
     double alpha_;
     // range constant for the state pdf
     double beta_;
 
-    // random number generator (Mersenne Twister)
-    std::mt19937 randgen_;
     // uniform double distribution from 0 to 1
     std::uniform_real_distribution<double> dist01_;
     // uniform size_t distribution from 0 to W-2
@@ -144,46 +151,41 @@ private:
     }
 
     // compute an iteration of the MCMC algorithm
-    std::array<Vector<N>, W> ComputeIter() {
+    void ComputeIter() {
 
-        // sample new states
-        std::array<Vector<N>, W> new_states;
-        std::array<double, W> move_prob;
+        #pragma omp parallel for
         for (unsigned int w = 0; w < W; w++) {
-            size_t idx = dist0W2_(randgen_);
+
+            // each thread gets its own RNG
+            thread_local static std::mt19937 randgen(std::random_device{}());
+
+            // sample new state
+            unsigned int idx = dist0W2_(randgen);
             if (idx >= w) {
                 idx++;
             }
 
             double stretch = SampleStretch();
-            move_prob[w] = 1/(W-1) * StretchP(stretch);
+            double move_prob = StretchP(stretch) /(W-1);
 
-            new_states[w] = states_[w] + (states_[idx] - states_[w]) * stretch;
-        }
+            Vector<N> new_state = states_[w] + (states_[idx] - states_[w]) * stretch;
+        
+            // calculate logprob
+            double new_logprob = lnP_(new_state);
 
-        // calculate logprobs
-        std::array<double, W> new_logprobs;
-        for (unsigned int w = 0; w < W; w++) {
-            new_logprobs[w] = lnP_(new_states[w]);
-        }
+            // calculate acceptance probability
+            double acceptance_prob = alpha_/move_prob * exp((new_logprob - logprobs_[w])/2);
 
-        // calculate acceptance probabilities
-        std::array<double, W> acceptance_probs;
-        for (unsigned int w = 0; w < W; w++) {
-            acceptance_probs[w] = alpha_/move_prob[w] * exp((new_logprobs[w] - logprobs_[w])/2);
-        }
+            // accept or reject
+            double rand01 = dist01_(randgen);
+            if (rand01 < acceptance_prob) {
+                states_[w] = new_state;
+                logprobs_[w] = new_logprob;
 
-        // accept or reject
-        std::array<Vector<N>, W> result = states_;
-        double rand01;
-        for (unsigned int w = 0; w < W; w++) {
-            rand01 = dist01_(randgen_);
-            if (rand01 < acceptance_probs[w]) {
-                result[w] = new_states[w];
+                #pragma omp atomic
+                num_accepted_++;
             }
         }
-
-        return result;
     }
 
 };

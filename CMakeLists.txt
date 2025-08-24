@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD 17)
 
 # find Eigen
 find_package(Eigen3 REQUIRED)
+# find OpenMP
+find_package(OpenMP REQUIRED)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
@@ -35,5 +37,6 @@ add_executable(cosmos_test
     test.cxx
 )
 target_link_libraries(cosmos_test PRIVATE cosmos)
+target_link_libraries(cosmos_test PRIVATE OpenMP::OpenMP_CXX)
 
 
