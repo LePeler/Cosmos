@@ -1,4 +1,4 @@
-#include <vector>
+#include <pair>
 #include <functional>
 #include <random>
 #include <fstream>
@@ -34,6 +34,9 @@ public:
         for (unsigned int w = 0; w < W; w++) {
             logprobs_[w] = lnP_(states_[w]);
         }
+
+        // update sampler members for the first time
+        UpdateInternals();
     }
 
     // destructor
@@ -125,7 +128,8 @@ public:
 
 
     // make an iteration of the respective MCMC algorithm
-    void MakeIter() {
+    // and save the resulting states to the .txt file
+    void MakeAndSaveIter() {
         ComputeIter();
 
         // write new states to txt file
@@ -141,6 +145,12 @@ public:
         }
         out_file_ << "\n";
         out_file_.close();
+    }
+
+    // make an iteration of the respective MCMC algorithm
+    // without saving the resulting states
+    void MakeIter() {
+        ComputeIter();
     }
 
 
@@ -166,6 +176,11 @@ protected:
     // .txt path/file to save sample to
     std::filesystem::path out_path_;
     std::ofstream out_file_;
+
+    // update the sampler members
+    // does nothing by default
+    // can be overwritten by children if needed
+    virtual void UpdateInternals() {};
 
     // sample a new state for walker w and also return the associated pdf value
     virtual std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) = 0;
@@ -200,8 +215,10 @@ protected:
                 num_accepted_++;
             }
         }
-
         num_iters_++;
+
+        // update sampler members
+        UpdateInternals();
     }
 };
 
