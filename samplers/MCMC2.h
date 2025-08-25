@@ -19,6 +19,10 @@ public:
         :
         MCMC_base<N, W>(lnP, init_states, alpha, out_path),
         beta_(beta),
+        Mu_(Vector<N>::Zero()),
+        Var_(Matrix<N>::Identity()),
+        L_(Matrix<N>::Identity()),
+        Zinv_(1.0),
         distN01_(0.0, 1.0)
     {}
 
@@ -43,15 +47,15 @@ private:
     std::normal_distribution<double> distN01_;
 
     // update the Mu_, Var_ and L_ members
-    void UpdateInternals() {
+    void UpdateInternals() override {
         Mu_ = this->GetStateMean();
-        Var_ = this->GetStateVarianceMatrix();
-        L_ = beta_*Var_.llt().matrixL();
+        Var_ = this->GetStateVarianceMatrix(Mu_);
+        L_ = beta_ * (Var_.llt().matrixL().toDenseMatrix());
         Zinv_ = 1/pow(2*M_PI, N/2)/L_.determinant();
     }
 
     // sample a new state for walker w and also return the associated pdf value
-    std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) {
+    std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) override {
 
         // sample a vector of standard normal distributed values
         Vector<N> z;
@@ -60,7 +64,7 @@ private:
         }
 
         return std::make_pair(
-            Mu_ + L_*z,
+            Mu_ + (L_.template triangularView<Eigen::Lower>()) * z,
             Zinv_ * exp(-z.dot(z) /beta_/beta_ /2)
         );
     }

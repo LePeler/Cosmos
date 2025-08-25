@@ -1,4 +1,4 @@
-#include <pair>
+#include <utility>
 #include <functional>
 #include <random>
 #include <fstream>
@@ -34,9 +34,6 @@ public:
         for (unsigned int w = 0; w < W; w++) {
             logprobs_[w] = lnP_(states_[w]);
         }
-
-        // update sampler members for the first time
-        UpdateInternals();
     }
 
     // destructor
@@ -59,9 +56,8 @@ public:
     }
 
     // get the state scalar variance (the trace of the variance matrix)
-    double GetStateVariance() const {
+    double GetStateVariance(const Vector<N> &mean) const {
         double result = 0;
-        Vector<N> mean = GetStateMean();
         for (unsigned int w = 0; w < W; w++) {
             result += (states_[w]-mean).dot(states_[w]-mean);
         }
@@ -70,10 +66,14 @@ public:
         return result;
     }
 
+    // overload to GetStateVariance()
+    double GetStateVariance() const {
+        return GetStateVariance(GetStateMean());
+    }
+
     // get the state scalar covariance (the trace of the covariance matrix)
-    double GetStateCovariance() const {
+    double GetStateCovariance(const Vector<N> &mean) const {
         double result = 0;
-        Vector<N> mean = GetStateMean();
         for (unsigned int w = 0; w < W; w++) {
             result += (states_[w]-mean).dot(states_[w]-mean);
             for (unsigned int j = 0; j < w; j++) {
@@ -85,10 +85,14 @@ public:
         return result;
     }
 
+    // overload to GetStateCovariance()
+    double GetStateCovariance() const {
+        return GetStateCovariance(GetStateMean());
+    }
+
     // get the state variance matrix
-    double GetStateVarianceMatrix() const {
-        double result = 0;
-        Vector<N> mean = GetStateMean();
+    Matrix<N> GetStateVarianceMatrix(const Vector<N> &mean) const {
+        Matrix<N> result = Matrix<N>::Zero();
         for (unsigned int w = 0; w < W; w++) {
             result += (states_[w]-mean)*(states_[w]-mean).transpose();
         }
@@ -97,11 +101,15 @@ public:
         return result;
     }
 
+    // overload to GetStateVarianceMatrix()
+    double GetStateVarianceMatrix() const {
+        return GetStateVarianceMatrix(GetStateMean());
+    }
+
     // get the state covariance matrix
-    Matrix<N> GetStateCovarianceMatrix() const {
+    Matrix<N> GetStateCovarianceMatrix(const Vector<N> &mean) const {
         Matrix<N> result = Matrix<N>::Zero();
         Matrix<N> temp;
-        Vector<N> mean = GetStateMean();
         for (unsigned int w = 0; w < W; w++) {
             result = (states_[w]-mean)*(states_[w]-mean).transpose();
             for (unsigned int j = 0; j < w; j++) {
@@ -112,6 +120,11 @@ public:
         result /= W;
 
         return result;
+    }
+
+    // overload to GetStateCovarianceMatrix()
+    double GetStateCovarianceMatrix() const {
+        return GetStateCovarianceMatrix(GetStateMean());
     }
 
 
@@ -188,6 +201,9 @@ protected:
     // compute an iteration of the respective MCMC algorithm
     void ComputeIter() {
 
+        // update sampler members
+        UpdateInternals();
+
         #pragma omp parallel for
         for (unsigned int w = 0; w < W; w++) {
 
@@ -216,9 +232,6 @@ protected:
             }
         }
         num_iters_++;
-
-        // update sampler members
-        UpdateInternals();
     }
 };
 

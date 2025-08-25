@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include <samplers/MCMC.h>
+#include <samplers/MCMC2.h>
 #include <ProgressBar.h>
 #include <utils.h>
 
@@ -40,9 +41,9 @@ int main(int argc, char* argv[]) {
 
 
 
-    MCMC<1, 10> sampler(log_gauss, init_states, 0.04, "/home/aurora/sim_results/MCMC_test.txt");
+    MCMC2<1, 10> sampler(log_gauss, init_states, 40, "/home/aurora/sim_results/MCMC_test.txt", 2);
 
-    unsigned int K = 1000000;
+    unsigned int K = 100000;
     DotProgressBar progress_bar(K, "iter(s)", int(K/100), 70);
 
     for (unsigned int k = 0; k < K; k++) {

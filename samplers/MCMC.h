@@ -34,7 +34,7 @@ private:
     std::uniform_int_distribution<size_t> dist0W2_;
 
     // sample a new state for walker w and also return the associated pdf value
-    std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) {
+    std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) override {
 
         // sample non-w walker for stretch move
         unsigned int idx = dist0W2_(randgen);
