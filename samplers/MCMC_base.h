@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <filesystem>
+#include <stdexcept>
 
 #include <omp.h>
 
@@ -30,6 +31,11 @@ public:
         dist01_(0.0, 1.0),
         out_path_(out_path)
     {
+        // check that the out file doesn't exist yet
+        if (std::filesystem::exists(out_path)) {
+            throw std::runtime_error(("The specified out file \"" + out_path.string() + "\" already exists.").c_str());
+        }
+
         // calculate initial logprobs
         for (unsigned int w = 0; w < W; w++) {
             logprobs_[w] = lnP_(states_[w]);
@@ -139,6 +145,12 @@ public:
         return double(num_accepted_)/(num_iters_*W);
     }
 
+    // reset the iteration counters
+    void ResetCounters() {
+        num_iters_ = 0;
+        num_accepted_ = 0;
+    }
+
 
     // make an iteration of the respective MCMC algorithm
     // and save the resulting states to the .txt file
@@ -151,10 +163,10 @@ public:
             throw std::runtime_error(("Could not open out file: " + out_path_.string()).c_str());
         }
         for (unsigned int w = 0; w < W-1; w++) {
-            for (int n = 0; n < N-1; n++) {
-                out_file_ << states_[n] << ", ";
+            for (int n = 0; n < N; n++) {
+                out_file_ << states_[w][n] << ", ";
             }
-            out_file_ << states_[N-1] << "\n";
+            out_file_ << logprobs_[w] << "\n";
         }
         out_file_ << "\n";
         out_file_.close();
@@ -200,6 +212,7 @@ protected:
 
     // compute an iteration of the respective MCMC algorithm
     void ComputeIter() {
+        num_iters_++;
 
         // update sampler members
         UpdateInternals();
@@ -231,7 +244,6 @@ protected:
                 num_accepted_++;
             }
         }
-        num_iters_++;
     }
 };
 

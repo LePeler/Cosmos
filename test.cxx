@@ -39,18 +39,22 @@ int main(int argc, char* argv[]) {
     init_states[8] = Vector<1>{0.07};
     init_states[9] = Vector<1>{0.85};
 
+    std::filesystem::path out_path("/home/aurora/sim_results/MCMC_test.txt");
+    if (std::filesystem::exists(out_path)) {
+        std::filesystem::remove(out_path);
+    }
 
-
-    MCMC2<1, 10> sampler(log_gauss, init_states, 40, "/home/aurora/sim_results/MCMC_test.txt", 2);
+    MCMC2<1, 10> sampler(log_gauss, init_states, 0.3, out_path, 2);
 
     unsigned int K = 100000;
     DotProgressBar progress_bar(K, "iter(s)", int(K/100), 70);
 
     for (unsigned int k = 0; k < K; k++) {
-        sampler.MakeIter();
+        sampler.MakeAndSaveIter();
         progress_bar.step();
         std::cout << "mean = " << sampler.GetStateMean() << std::endl;
         std::cout << "variance = " << sampler.GetStateVariance() << std::endl;
+        std::cout << "eff num states = " << sampler.GetEffectiveNumStates() << std::endl;
         std::cout << std::endl;
     }
 
