@@ -80,15 +80,25 @@ public:
         return result;
     }
 
-    // get the state variance matrix
-    Matrix<N> GetStateVariance(const std::array<Vector<N>, W> &states, const Vector<N> &mean) const {
+    // get the covariance between two sets of walker states
+    Matrix<N> GetStatesCovariance(const std::array<Vector<N>, W> &states1, const std::array<Vector<N>, W> &states2, const Vector<N> &mean1, const Vector<N> &mean2) const {
         Matrix<N> result = Matrix<N>::Zero();
         for (unsigned int w = 0; w < W; w++) {
-            result += (states[w]-mean)*(states[w]-mean).transpose();
+            result += (states1[w]-mean1)*(states2[w]-mean2).transpose();
         }
         result /= W;
 
         return result;
+    }
+
+    // GetStatesCovariance(states1, states2, GetStateMean(states1), GetStateMean(states2))
+    Matrix<N> GetStatesCovariance(const std::array<Vector<N>, W> &states1, const std::array<Vector<N>, W> &states2) const {
+        return GetStatesCovariance(states1, states2, GetStateMean(states1), GetStateMean(states2));
+    }
+
+    // get the state variance matrix
+    Matrix<N> GetStateVariance(const std::array<Vector<N>, W> &states, const Vector<N> &mean) const {
+        return GetStatesCovariance(states, states, mean, mean);
     }
 
     // GetStateVariance(states, GetStateMean(states))
@@ -106,38 +116,11 @@ public:
         return GetStateVariance(states_);
     }
 
-    // get the sample variance matrix
-    Matrix<N> GetSampleVariance(const Vector<N> &mean) const {
-        Matrix<N> result = Matrix<N>::Zero();
-        for (const std::array<Vector<N>, W> &states : sample_) {
-            result += GetStateVariance(states, mean);
-        }
-        result /= sample_.size();
-
-        return result;
-    }
-
-    // GetSampleVariance(GetSampleMean())
-    Matrix<N> GetSampleVariance() const {
-        return GetSampleVariance(GetSampleMean());
-    }
-
-    // get the state lag-k covariance matrix
-    Matrix<N> GetStatesCovariance(const std::array<Vector<N>, W> &states1, const std::array<Vector<N>, W> &states2, const Vector<N> &mean) const {
-        Matrix<N> result = Matrix<N>::Zero();
-        for (unsigned int w = 0; w < W; w++) {
-            result += (states1[w]-mean)*(states2[w]-mean).transpose();
-        }
-        result /= W;
-
-        return result;
-    }
-
     // get the sample lag-k covariance matrix
     Matrix<N> GetSampleLagKCovariance(unsigned int k, const Vector<N> &mean) const {
         Matrix<N> result = Matrix<N>::Zero();
         for (size_t j = 0; j < sample_.size()-k; j++) {
-            result += GetStatesCovariance(sample_[j], sample_[j+k], mean);
+            result += GetStatesCovariance(sample_[j], sample_[j+k], mean, mean);
         }
         result /= sample_.size();
 
@@ -149,12 +132,22 @@ public:
         return GetSampleLagKCovariance(k, GetSampleMean());
     }
 
-    // get the sample covariance matrix
-    Matrix<N> GetSampleCovariance(const Vector<N> &mean) const {
+    // get the sample variance matrix
+    Matrix<N> GetSampleVariance(const Vector<N> &mean) const {
+        return GetSampleLagKCovariance(0, mean);
+    }
+
+    // GetSampleVariance(GetSampleMean())
+    Matrix<N> GetSampleVariance() const {
+        return GetSampleVariance(GetSampleMean());
+    }
+
+    // get the sample covariance matrix and the integrated autocorrelation time
+    std::pair<Matrix<N>, double> GetSampleCovarianceAndIntegAutocorrTime(const Vector<N> &mean) const {
         Matrix<N> result = GetSampleVariance(mean);
         double det_var = result.determinant();
         Matrix<N> lag_k;
-        double tau;
+        double tau = 1.0;
         for (unsigned int k = 1; k < sample_.size()/2; k++) {
             lag_k = GetSampleLagKCovariance(k, mean);
             result += lag_k + lag_k.transpose();
@@ -165,7 +158,17 @@ public:
             }
         }
 
-        return result;
+        return std::make_pair(result, tau);
+    }
+
+    // GetSampleCovarianceAndIntegAutocorrTime(GetSampleMean())
+    std::pair<Matrix<N>, double> GetSampleCovarianceAndIntegAutocorrTime() const {
+        return GetSampleCovarianceAndIntegAutocorrTime(GetSampleMean());
+    }
+
+    // get the sample covariance matrix
+    Matrix<N> GetSampleCovariance(const Vector<N> &mean) const {
+        return GetSampleCovarianceAndIntegAutocorrTime(mean).first;
     }
 
     // GetSampleCovariance(GetSampleMean())
@@ -175,21 +178,7 @@ public:
 
     // get the integrated autocorrelation time
     double GetIntegAutocorrTime(const Vector<N> &mean) const {
-        Matrix<N> result = GetSampleVariance(mean);
-        double det_var = result.determinant();
-        Matrix<N> lag_k;
-        double tau;
-        for (unsigned int k = 1; k < sample_.size()/2; k++) {
-            lag_k = GetSampleLagKCovariance(k, mean);
-            result += lag_k + lag_k.transpose();
-
-            tau = pow(result.determinant()/det_var, 1/N);
-            if (k > 5*tau) {
-                break;
-            }
-        }
-
-        return tau;
+        return GetSampleCovarianceAndIntegAutocorrTime(mean).second;
     }
 
     // GetIntegAutocorrTime(GetSampleMean())
