@@ -21,25 +21,23 @@ class MCMC_base {
 
 public:
     // constructor
-    MCMC_base(std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha, std::filesystem::path out_path)
+    MCMC_base(std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha)
         :
         lnP_(lnP),
         states_(init_states),
         num_iters_(0),
         num_accepted_(0),
         alpha_(alpha),
-        dist01_(0.0, 1.0),
-        out_path_(out_path)
+        dist01_(0.0, 1.0)
     {
-        // check that the out file doesn't exist yet
-        if (std::filesystem::exists(out_path)) {
-            throw std::runtime_error(("The specified out file \"" + out_path.string() + "\" already exists.").c_str());
-        }
-
         // calculate initial logprobs
         for (unsigned int w = 0; w < W; w++) {
             logprobs_[w] = lnP_(states_[w]);
         }
+
+        // append initial states and logprobs to the sample
+        sample_.push_back(states_);
+        sample_logprobs_.push_back(logprobs_);
     }
 
     // destructor
@@ -50,93 +48,153 @@ public:
         return states_;
     }
 
+    // get the entire sample
+    std::vector<std::array<Vector<N>, W>> GetSample() const {
+        return sample_;
+    }
+
     // get the state mean
-    Vector<N> GetStateMean() const {
+    Vector<N> GetStateMean(const std::array<Vector<N>, W> &states) const {
         Vector<N> result = Vector<N>::Zero();
         for (unsigned int w = 0; w < W; w++) {
-            result += states_[w];
+            result += states[w];
         }
         result /= W;
 
         return result;
     }
 
-    // get the state scalar variance (the trace of the variance matrix)
-    double GetStateVariance(const Vector<N> &mean) const {
-        double result = 0;
-        for (unsigned int w = 0; w < W; w++) {
-            result += (states_[w]-mean).dot(states_[w]-mean);
+    // GetStateMean(states_)
+    Vector<N> GetStateMean() const {
+        return GetStateMean(states_);
+    }
+
+    // get the sample mean
+    Vector<N> GetSampleMean() const {
+        Vector<N> result = Vector<N>::Zero();
+        for (const std::array<Vector<N>, W> &states : sample_) {
+            result += GetStateMean(states);
         }
-        result /= W;
+        result /= sample_.size();
 
         return result;
-    }
-
-    // overload to GetStateVariance()
-    double GetStateVariance() const {
-        return GetStateVariance(GetStateMean());
-    }
-
-    // get the state scalar covariance (the trace of the covariance matrix)
-    double GetStateCovariance(const Vector<N> &mean) const {
-        double result = 0;
-        for (unsigned int w = 0; w < W; w++) {
-            result += (states_[w]-mean).dot(states_[w]-mean);
-            for (unsigned int j = 0; j < w; j++) {
-                result += 2*(states_[w]-mean).dot(states_[j]-mean);
-            }
-        }
-        result /= W;
-
-        return result;
-    }
-
-    // overload to GetStateCovariance()
-    double GetStateCovariance() const {
-        return GetStateCovariance(GetStateMean());
     }
 
     // get the state variance matrix
-    Matrix<N> GetStateVarianceMatrix(const Vector<N> &mean) const {
+    Matrix<N> GetStateVariance(const std::array<Vector<N>, W> &states, const Vector<N> &mean) const {
         Matrix<N> result = Matrix<N>::Zero();
         for (unsigned int w = 0; w < W; w++) {
-            result += (states_[w]-mean)*(states_[w]-mean).transpose();
+            result += (states[w]-mean)*(states[w]-mean).transpose();
         }
         result /= W;
 
         return result;
     }
 
-    // overload to GetStateVarianceMatrix()
-    double GetStateVarianceMatrix() const {
-        return GetStateVarianceMatrix(GetStateMean());
+    // GetStateVariance(states, GetStateMean(states))
+    Matrix<N> GetStateVariance(const std::array<Vector<N>, W> &states) const {
+        return GetStateVariance(states, GetStateMean(states));
     }
 
-    // get the state covariance matrix
-    Matrix<N> GetStateCovarianceMatrix(const Vector<N> &mean) const {
+    // GetStateVariance(states_, mean)
+    Matrix<N> GetStateVariance(const Vector<N> &mean) const {
+        return GetStateVariance(states_, mean);
+    }
+
+    // GetStateVariance(states_)
+    Matrix<N> GetStateVariance() const {
+        return GetStateVariance(states_);
+    }
+
+    // get the sample variance matrix
+    Matrix<N> GetSampleVariance(const Vector<N> &mean) const {
         Matrix<N> result = Matrix<N>::Zero();
-        Matrix<N> temp;
+        for (const std::array<Vector<N>, W> &states : sample_) {
+            result += GetStateVariance(states, mean);
+        }
+        result /= sample_.size();
+
+        return result;
+    }
+
+    // GetSampleVariance(GetSampleMean())
+    Matrix<N> GetSampleVariance() const {
+        return GetSampleVariance(GetSampleMean());
+    }
+
+    // get the state lag-k covariance matrix
+    Matrix<N> GetStatesCovariance(const std::array<Vector<N>, W> &states1, const std::array<Vector<N>, W> &states2, const Vector<N> &mean) const {
+        Matrix<N> result = Matrix<N>::Zero();
         for (unsigned int w = 0; w < W; w++) {
-            result = (states_[w]-mean)*(states_[w]-mean).transpose();
-            for (unsigned int j = 0; j < w; j++) {
-                temp = (states_[w]-mean)*(states_[j]-mean).transpose();
-                result += temp + temp.transpose();
+            result += (states1[w]-mean)*(states2[w]-mean).transpose();
+        }
+        result /= W;
+
+        return result;
+    }
+
+    // get the sample lag-k covariance matrix
+    Matrix<N> GetSampleLagKCovariance(unsigned int k, const Vector<N> &mean) const {
+        Matrix<N> result = Matrix<N>::Zero();
+        for (size_t j = 0; j < sample_.size()-k; j++) {
+            result += GetStatesCovariance(sample_[j], sample_[j+k], mean);
+        }
+        result /= sample_.size();
+
+        return result;
+    }
+
+    // GetSampleLagKCovariance(k, GetSampleMean())
+    Matrix<N> GetSampleLagKCovariance(unsigned int k) const {
+        return GetSampleLagKCovariance(k, GetSampleMean());
+    }
+
+    // get the sample covariance matrix
+    Matrix<N> GetSampleCovariance(const Vector<N> &mean) const {
+        Matrix<N> result = GetSampleVariance(mean);
+        double det_var = result.determinant();
+        Matrix<N> lag_k;
+        double tau;
+        for (unsigned int k = 1; k < sample_.size()/2; k++) {
+            lag_k = GetSampleLagKCovariance(k, mean);
+            result += lag_k + lag_k.transpose();
+
+            tau = pow(result.determinant()/det_var, 1/N);
+            if (k > 5*tau) {
+                break;
             }
         }
-        result /= W;
 
         return result;
     }
 
-    // overload to GetStateCovarianceMatrix()
-    double GetStateCovarianceMatrix() const {
-        return GetStateCovarianceMatrix(GetStateMean());
+    // GetSampleCovariance(GetSampleMean())
+    Matrix<N> GetSampleCovariance() const {
+        return GetSampleCovariance(GetSampleMean());
     }
 
+    // get the integrated autocorrelation time
+    double GetIntegAutocorrTime(const Vector<N> &mean) const {
+        Matrix<N> result = GetSampleVariance(mean);
+        double det_var = result.determinant();
+        Matrix<N> lag_k;
+        double tau;
+        for (unsigned int k = 1; k < sample_.size()/2; k++) {
+            lag_k = GetSampleLagKCovariance(k, mean);
+            result += lag_k + lag_k.transpose();
 
-    // get the effective number of independent states (due to the state covariance)
-    double GetEffectiveNumStates() const {
-        return W * GetStateVariance()/GetStateCovariance();
+            tau = pow(result.determinant()/det_var, 1/N);
+            if (k > 5*tau) {
+                break;
+            }
+        }
+
+        return tau;
+    }
+
+    // GetIntegAutocorrTime(GetSampleMean())
+    double GetIntegAutocorrTime() const {
+        return GetIntegAutocorrTime(GetSampleMean());
 
     }
 
@@ -145,37 +203,51 @@ public:
         return double(num_accepted_)/(num_iters_*W);
     }
 
-    // reset the iteration counters
-    void ResetCounters() {
+    // reset the members (i.e. sample, logprobs and counters)
+    void Reset() {
+        sample_ = {states_};
+        sample_logprobs_ = {logprobs_};
         num_iters_ = 0;
         num_accepted_ = 0;
     }
 
-
     // make an iteration of the respective MCMC algorithm
-    // and save the resulting states to the .txt file
-    void MakeAndSaveIter() {
+    void MakeIter() {
+        // compute iteration
         ComputeIter();
 
-        // write new states to txt file
-        out_file_.open(out_path_, std::ios::app);
-        if (!out_file_) {
-            throw std::runtime_error(("Could not open out file: " + out_path_.string()).c_str());
-        }
-        for (unsigned int w = 0; w < W-1; w++) {
-            for (int n = 0; n < N; n++) {
-                out_file_ << states_[w][n] << ", ";
-            }
-            out_file_ << logprobs_[w] << "\n";
-        }
-        out_file_ << "\n";
-        out_file_.close();
+        // append new states and logprobs to the sample
+        sample_.push_back(states_);
+        sample_logprobs_.push_back(logprobs_);
     }
 
-    // make an iteration of the respective MCMC algorithm
-    // without saving the resulting states
-    void MakeIter() {
-        ComputeIter();
+    // savd the sample to a txt file
+    void SaveSample(std::filesystem::path path, bool overwrite = false) {
+        // check that the out file doesn't exist yet if overwrite is disabled
+        if (!overwrite && std::filesystem::exists(path)) {
+            throw std::runtime_error(("The path \"" + path.string() + "\" already exists and must not be overwritten.").c_str());
+        }
+
+        // open the file
+        std::ofstream file;
+        file.open(path);
+        if (!file) {
+            throw std::runtime_error(("Could not open \"" + path.string() + "\".").c_str());
+        }
+
+        // write the sample
+        for (size_t j = 0; j < sample_.size(); j++) {
+            for (unsigned int w = 0; w < W; w++) {
+                for (int n = 0; n < N; n++) {
+                    file << sample_[j][w][n] << ", ";
+                }
+                file << sample_logprobs_[j][w] << "\n";
+            }
+            file << "\n";
+        }
+
+        // close the file
+        file.close();
     }
 
 
@@ -185,8 +257,12 @@ protected:
 
     // current states of the walkers
     std::array<Vector<N>, W> states_;
-    // logprobs at the current states
+    // the logprobs of the current states
     std::array<double, W> logprobs_;
+    // the entire sample
+    std::vector<std::array<Vector<N>, W>> sample_;
+    // the logprobs of the sample
+    std::vector<std::array<double, W>> sample_logprobs_;
     // number of performed iterations
     size_t num_iters_;
     // number of accepted new states
@@ -197,10 +273,6 @@ protected:
 
     // uniform double distribution from 0 to 1
     std::uniform_real_distribution<double> dist01_;
-
-    // .txt path/file to save sample to
-    std::filesystem::path out_path_;
-    std::ofstream out_file_;
 
     // update the sampler members
     // does nothing by default

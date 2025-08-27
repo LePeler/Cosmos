@@ -15,9 +15,9 @@ class MCMC2 : public MCMC_base<N, W> {
 
 public:
     // constructor
-    MCMC2(std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha, std::filesystem::path out_path, double beta = 1)
+    MCMC2(std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha, double beta = 1)
         :
-        MCMC_base<N, W>(lnP, init_states, alpha, out_path),
+        MCMC_base<N, W>(lnP, init_states, alpha),
         beta_(beta),
         Mu_(Vector<N>::Zero()),
         Var_(Matrix<N>::Identity()),
@@ -49,7 +49,7 @@ private:
     // update the Mu_, Var_ and L_ members
     void UpdateInternals() override {
         Mu_ = this->GetStateMean();
-        Var_ = this->GetStateVarianceMatrix(Mu_);
+        Var_ = this->GetStateVariance(Mu_);
         L_ = beta_ * (Var_.llt().matrixL().toDenseMatrix());
         Zinv_ = 1/pow(2*M_PI, N/2)/L_.determinant();
     }
