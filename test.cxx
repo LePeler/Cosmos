@@ -15,7 +15,7 @@ double mean = 0;
 double sigma = 1;
 
 double log_gauss(const Vector<1> &state) {
-    return -(state[0]-mean)*(state[0]-mean)/2/sigma/sigma - log(2*M_PI*sigma*sigma)/2;
+    return -(state(0)-mean)*(state(0)-mean)/2/sigma/sigma - log(2*M_PI*sigma*sigma)/2;
 }
 
 
@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
 
-    std::filesystem::path out_path("/home/aurora/sim_results/MCMC_test.txt");
+    fs::path out_path("/home/aurora/sim_results/MCMC_test.txt");
     sampler.SaveSample(out_path, true);
 }
 

@@ -39,4 +39,9 @@ add_executable(cosmos_test
 target_link_libraries(cosmos_test PRIVATE cosmos)
 target_link_libraries(cosmos_test PRIVATE OpenMP::OpenMP_CXX)
 
-
+# MCMC executable
+add_executable(test_MCMC
+    models/run_MCMC.cxx
+)
+target_link_libraries(test_MCMC PRIVATE cosmos)
+target_link_libraries(test_MCMC PRIVATE OpenMP::OpenMP_CXX)

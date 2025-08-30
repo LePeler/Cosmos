@@ -18,7 +18,7 @@ unsigned int K = 2e8;
 
 Vector<1> LCDM(const Vector<1> &a, double t) {
     Vector<1> result;
-    result[0] = H0 * sqrt(OmM0/a[0] + OmR0/a[0]/a[0] + OmL0*a[0]*a[0]);
+    result(0) = H0 * sqrt(OmM0/a(0) + OmR0/a(0)/a(0) + OmL0*a(0)*a(0));
     return result;
 }
 
@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
         solver.MakeStep(-dt);
         progress_bar.step();
 
-        if (std::isnan(solver.GetCurrentValue()[0])) {
+        if (std::isnan(solver.GetCurrentValue()(0))) {
             std::cout << "Big Bang reached! Solving stopped." << std::endl;
             break;
         }

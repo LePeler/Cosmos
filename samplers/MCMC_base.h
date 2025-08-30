@@ -211,9 +211,9 @@ public:
     }
 
     // savd the sample to a txt file
-    void SaveSample(std::filesystem::path path, bool overwrite = false) {
+    void SaveSample(fs::path path, bool overwrite = false) {
         // check that the out file doesn't exist yet if overwrite is disabled
-        if (!overwrite && std::filesystem::exists(path)) {
+        if (!overwrite && fs::exists(path)) {
             throw std::runtime_error(("The path \"" + path.string() + "\" already exists and must not be overwritten.").c_str());
         }
 
@@ -228,7 +228,7 @@ public:
         for (size_t j = 0; j < sample_.size(); j++) {
             for (unsigned int w = 0; w < W; w++) {
                 for (int n = 0; n < N; n++) {
-                    file << sample_[j][w][n] << ", ";
+                    file << sample_[j][w](n) << ", ";
                 }
                 file << sample_logprobs_[j][w] << "\n";
             }

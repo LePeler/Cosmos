@@ -60,7 +60,7 @@ private:
         // sample a vector of standard normal distributed values
         Vector<N> z;
         for (unsigned int n = 0; n < N; n++) {
-            z[n] = distN01_(randgen);
+            z(n) = distN01_(randgen);
         }
 
         return std::make_pair(

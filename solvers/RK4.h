@@ -8,13 +8,13 @@
 #define RK4_H_INCLUDED
 
 
-// 4th order Runge Kutta solver for 1st order differential equations
-template<int N>
+// 4th order Runge Kutta solver for 1st order differential equations in D dimensions
+template<int D>
 class RK4 {
 
 public:
     // constructor
-    RK4(std::function<Vector<N>(const Vector<N> &, double)> func, Vector<N> y0, double t0)
+    RK4(std::function<Vector<D>(const Vector<D> &, double)> func, Vector<D> y0, double t0)
         :
         func_(func),
         y_(y0),
@@ -33,7 +33,7 @@ public:
     }
 
     // get the last computed value
-    Vector<N> GetCurrentValue() const {
+    Vector<D> GetCurrentValue() const {
         return y_;
     }
 
@@ -43,9 +43,9 @@ public:
     }
 
     // get all computed values
-    std::vector<Vector<N>> GetValues() const {
-        std::vector<Vector<N>> result;
-        for (Vector<N> val : Y_) {
+    std::vector<Vector<D>> GetValues() const {
+        std::vector<Vector<D>> result;
+        for (Vector<D> val : Y_) {
             result.push_back(val);
         }
         return result;
@@ -77,25 +77,25 @@ public:
 
 private:
     // function that gives y'(y, t)
-    std::function<Vector<N>(const Vector<N> &, double)> func_;
+    std::function<Vector<D>(const Vector<D> &, double)> func_;
 
     // vector that stores the times for which values were calculated
     std::vector<double> T_;
     // vector that stores the computed values
-    std::vector<Vector<N>> Y_;
+    std::vector<Vector<D>> Y_;
 
     // current time
     double t_;
     // current value
-    Vector<N> y_;
+    Vector<D> y_;
 
     // compute a step of the RK4 solving algorithm
-    Vector<N> ComputeStep(double dt) const {
+    Vector<D> ComputeStep(double dt) const {
 
-        Vector<N> k1 = func_(y_, t_);
-        Vector<N> k2 = func_(y_ + k1*dt/2, t_ + dt/2);
-        Vector<N> k3 = func_(y_ + k2*dt/2, t_ + dt/2);
-        Vector<N> k4 = func_(y_ + k3*dt, t_ + dt);
+        Vector<D> k1 = func_(y_, t_);
+        Vector<D> k2 = func_(y_ + k1*dt/2, t_ + dt/2);
+        Vector<D> k3 = func_(y_ + k2*dt/2, t_ + dt/2);
+        Vector<D> k4 = func_(y_ + k3*dt, t_ + dt);
 
         return y_ + (k1 + k2*2 + k3*2 + k4)/6 * dt;
     }

@@ -20,9 +20,9 @@ unsigned int K = 2e8;
 // state = {a, phi, psi}
 Vector<3> quintessence(const Vector<3> &state, double t) {
     Vector<3> result;
-    result[0] = H0 * sqrt(OmM0/state[0] + OmR0/state[0]/state[0] + state[0]*state[0]*(state[2]*state[2]/2 + V0*pow(state[1], n)));
-    result[1] = state[2];
-    result[2] = -3*result[0]/state[0]*state[2] - V0*pow(state[1], n);
+    result(0) = H0 * sqrt(OmM0/state(0) + OmR0/state(0)/state(0) + state(0)*state(0)*(state(2)*state(2)/2 + V0*pow(state(1), n)));
+    result(1) = state(2);
+    result(2) = -3*result(0)/state(0)*state(2) - V0*pow(state(1), n);
     return result;
 }
 
@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
         solver.MakeStep(-dt);
         progress_bar.step();
 
-        if (std::isnan(solver.GetCurrentValue()[0])) {
+        if (std::isnan(solver.GetCurrentValue()(0))) {
             std::cout << "Big Bang reached! Solving stopped." << std::endl;
             break;
         }
