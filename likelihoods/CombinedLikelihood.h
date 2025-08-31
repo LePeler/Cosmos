@@ -33,9 +33,9 @@ public:
         // combine all redshifts and sort
         std::vector<double> z_H_tmp = {0};
         for (const std::shared_ptr<LikelihoodBase<N>> &likelihood : likelihoods_) {
-            z_H_tmp.insert(z_H_tmp.end(), likelihood->GetZ().begin(), likelihood->GetZ().end());
+            insert(z_H_tmp, likelihood->GetZ());
         }
-        std::sort(z_H_tmp.begin(), z_H_tmp.end());
+        sort(z_H_tmp);
 
         // insert filler values where distance too large
         double dz_max = 0.01;
@@ -59,10 +59,10 @@ public:
         // combine all redshifts at which D_C is needed and sort
         for (const std::shared_ptr<LikelihoodBase<N>> &likelihood : likelihoods_) {
             if (likelihood->NeedsD_C()) {
-                z_D_C_.insert(z_D_C_.end(), likelihood->GetZ().begin(), likelihood->GetZ().end());
+                insert(z_D_C_, likelihood->GetZ());
             }
         }
-        std::sort(z_D_C_.begin(), z_D_C_.end());
+        sort(z_D_C_);
     }
 
     ~CombinedLikelihood() = default;
@@ -83,9 +83,12 @@ public:
         }
 
         // integrate 1/H to give D_C
-        std::vector<double> D_C_comp = {integrate_inverse(z_H_, H_comp, 0.0, z_D_C_[0])};
-        for (size_t j = 1; j < z_D_C_.size(); j++) {
-            D_C_comp.push_back(D_C_comp.back() + integrate_inverse(z_H_, H_comp, z_D_C_[j-1], z_D_C_[j]));
+        std::vector<double> D_C_comp;
+        if (z_D_C_.size() > 0) {
+            D_C_comp.push_back(z_H_[0]/H_comp[0] + integrate_inverse(z_H_, H_comp, z_H_[0], z_D_C_[0]));
+            for (size_t j = 1; j < z_D_C_.size(); j++) {
+                D_C_comp.push_back(D_C_comp.back() + integrate_inverse(z_H_, H_comp, z_D_C_[j-1], z_D_C_[j]));
+            }
         }
 
         // call the individual log likelihoods

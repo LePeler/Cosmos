@@ -19,11 +19,11 @@ double Or0 = 5e-5;
 // double OmL0 = 1.0 - Om0 - Or0;
 
 
-Vector<0> Model(Vector<0> state, double z, Vector<2> params) {
+Vector<0> Model(Vector<0> state, double z, Vector<3> params) {
     return Vector<0>{};
 }
 
-double GetH(Vector<0> state, double z, Vector<2> params) {
+double GetH(Vector<0> state, double z, Vector<3> params) {
     double H0 = params(0);
     double Om0 = params(1);
     double a = 1/(1.0+z);
@@ -33,12 +33,12 @@ double GetH(Vector<0> state, double z, Vector<2> params) {
 
 int main(int argc, char* argv[]) {
 
-    std::vector<std::shared_ptr<LikelihoodBase<2>>> likelihoods;
-    likelihoods.push_back(std::make_shared<CC<2>>("/home/aurora/university/ISSA/MCMC_Data/CC"));
+    std::vector<std::shared_ptr<LikelihoodBase<3>>> likelihoods;
+    likelihoods.push_back(std::make_shared<SN1a<3>>("/home/aurora/university/ISSA/MCMC_Data/SN1a", 2));
 
-    CombinedLikelihood<2, 0> combined_likelihood(likelihoods, Model, Vector<0>{}, GetH);
+    CombinedLikelihood<3, 0> combined_likelihood(likelihoods, Model, Vector<0>{}, GetH);
 
-    std::cout << combined_likelihood.log_likelihood(Vector<2>{69.0, 0.3}) << std::endl;
+    std::cout << combined_likelihood.log_likelihood(Vector<3>{69.0, 0.3, -19}) << std::endl;
 
 
 

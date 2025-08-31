@@ -48,7 +48,7 @@ public:
         std::vector<std::vector<double>> inv_cov_signal_tmp = read_txt(data_dir / fs::path("SN1a_inv_cov_signal.txt"), ',');
         inv_cov_signal_ = convert_matrix(inv_cov_signal_tmp);
         std::vector<std::vector<double>> inv_cov_mix_tmp = read_txt(data_dir / fs::path("SN1a_inv_cov_mix.txt"), ',');
-        inv_cov_mix_ = convert_matrix(inv_cov_mix_tmp);
+        inv_cov_mix_ = convert_nonsquarematrix(inv_cov_mix_tmp);
         std::vector<std::vector<double>> inv_cov_calib_tmp = read_txt(data_dir / fs::path("SN1a_inv_cov_calib.txt"), ',');
         inv_cov_calib_ = convert_matrix(inv_cov_calib_tmp);
     }

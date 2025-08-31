@@ -58,19 +58,23 @@ public:
         angle_3_ = convert_vector(angle_3_tmp);
 
         // concatenate z_1, z_2 and z_3 and sort
-        z_.insert(z_.end(), z_1_.begin(), z_1_.end());
-        z_.insert(z_.end(), z_2_.begin(), z_2_.end());
-        z_.insert(z_.end(), z_3_.begin(), z_3_.end());
-        std::sort(z_.begin(), z_.end());
+        insert(z_, z_1_);
+        insert(z_, z_2_);
+        insert(z_, z_3_);
+        sort(z_);
 
         std::vector<std::vector<double>> inv_cov_1_tmp = read_txt(data_dir / fs::path("BAO_inv_cov_1.txt"), ',');
         inv_cov_1_ = convert_matrix(inv_cov_1_tmp);
         std::vector<std::vector<double>> inv_cov_mix12_tmp = read_txt(data_dir / fs::path("BAO_inv_cov_mix12.txt"), ',');
-        inv_cov_mix12_ = convert_matrix(inv_cov_mix12_tmp);
+        inv_cov_mix12_ = convert_nonsquarematrix(inv_cov_mix12_tmp);
         std::vector<std::vector<double>> inv_cov_2_tmp = read_txt(data_dir / fs::path("BAO_inv_cov_2.txt"), ',');
         inv_cov_2_ = convert_matrix(inv_cov_2_tmp);
+        std::vector<std::vector<double>> inv_cov_mix23_tmp = read_txt(data_dir / fs::path("BAO_inv_cov_mix23.txt"), ',');
+        inv_cov_mix23_ = convert_nonsquarematrix(inv_cov_mix23_tmp);
         std::vector<std::vector<double>> inv_cov_3_tmp = read_txt(data_dir / fs::path("BAO_inv_cov_3.txt"), ',');
         inv_cov_3_ = convert_matrix(inv_cov_3_tmp);
+        std::vector<std::vector<double>> inv_cov_mix31_tmp = read_txt(data_dir / fs::path("BAO_inv_cov_mix31.txt"), ',');
+        inv_cov_mix31_ = convert_nonsquarematrix(inv_cov_mix31_tmp);
 
         // read in R_drag values for interpolation
         for (const std::vector<double> &datapoint : read_txt(data_dir / fs::path("BAO_R_drag_H0.txt"), ',')) {
@@ -94,22 +98,22 @@ public:
         // calculate radius at the end of the drag epoch
         double r_s = interpolate2d(R_drag_H0_, R_drag_Om_, R_drag_grid_, params(H0_idx_), params(Om_idx_));
 
-        // calculate predicted angles for 1d BAO measurements
+        // calculate predicted angles for type 1 measurements
         Vector<-1> angle_1(z_1_.size());
+        double d_c;
         for (int j = 0; j < z_1_.size(); j++) {
-            angle_1(j) = 1 /interpolate(z_H, H_comp, z_1_[j]) /r_s;
+            d_c = interpolate(z_D_C, D_C_comp, z_1_[j]);
+            angle_1(j) = pow((z_1_[j] *d_c *d_c /interpolate(z_H, H_comp, z_1_[j])), 1/3) /r_s;
         }
-        // calculate predicted angles for 2d BAO measurements
+        // calculate predicted angles for type 2 measurements
         Vector<-1> angle_2(z_2_.size());
         for (int j = 0; j < z_2_.size(); j++) {
             angle_2(j) = interpolate(z_D_C, D_C_comp, z_2_[j]) /(1.0 + z_2_[j]) /r_s;
         }
-        // calculate predicted angles for 3d BAO measurements
+        // calculate predicted angles for type 3 measurements
         Vector<-1> angle_3(z_3_.size());
-        double d_c;
         for (int j = 0; j < z_3_.size(); j++) {
-            d_c = interpolate(z_D_C, D_C_comp, z_3_[j]);
-            angle_3(j) = pow((z_3_[j] *d_c *d_c /interpolate(z_H, H_comp, z_3_[j])), 1/3) /r_s;
+            angle_3(j) = 1 /interpolate(z_H, H_comp, z_3_[j]) /r_s;
         }
 
         // calculate all angle residuals
@@ -119,9 +123,11 @@ public:
 
         // return the gaussian log likelihood
         return -(inv_cov_1_*residuals_1).dot(residuals_1) /2
-               -(inv_cov_mix12_*residuals_1).dot(residuals_2)
+               -(inv_cov_mix12_*residuals_2).dot(residuals_1)
                -(inv_cov_2_*residuals_2).dot(residuals_2) /2
-               -(inv_cov_3_*residuals_3).dot(residuals_3) /2;
+               -(inv_cov_mix23_*residuals_3).dot(residuals_2)
+               -(inv_cov_3_*residuals_3).dot(residuals_3) /2
+               -(inv_cov_mix31_*residuals_1).dot(residuals_3);
     }
 
 
@@ -136,7 +142,9 @@ private:
     Matrix<-1> inv_cov_1_;
     NonSquareMatrix<-1,-1> inv_cov_mix12_;
     Matrix<-1> inv_cov_2_;
+    NonSquareMatrix<-1,-1> inv_cov_mix23_;
     Matrix<-1> inv_cov_3_;
+    NonSquareMatrix<-1,-1> inv_cov_mix31_;
 
     // indices of the Hubble constant and the Matter fraction in the MCMC parameters
     size_t H0_idx_;

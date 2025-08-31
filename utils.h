@@ -21,6 +21,10 @@ template<int N, int K>
 using NonSquareMatrix = Eigen::Matrix<double, N, K>;
 
 
+// speed of light in km/s
+double c = 299792.458;
+
+
 void save_vector_as_txt(const std::vector<double> &vec, fs::path path, unsigned int save_every = 1) {
     // save a std::vector<T> as a .txt file, save only every skip values
 
@@ -95,6 +99,20 @@ std::vector<std::vector<double>> read_txt(fs::path path, char delimiter) {
 }
 
 
+// wrapper around std::vector<>::insert
+template<typename T>
+void insert(std::vector<T> &insert_into, const std::vector<T> &to_insert) {
+    insert_into.insert(insert_into.end(), to_insert.begin(), to_insert.end());
+}
+
+
+// wrapper around std::sort
+template<typename T>
+void sort(std::vector<T> &to_sort) {
+    std::sort(to_sort.begin(), to_sort.end());
+}
+
+
 // interpolate linearly
 double interpolate(const std::vector<double> &X, const std::vector<double> &Y, double x) {
     if (X.size() != Y.size()) {
@@ -116,7 +134,7 @@ double interpolate(const std::vector<double> &X, const std::vector<double> &Y, d
     }
 
     // x is not between min(X) and max(X) so cannot interpolate
-    return NAN;
+    throw std::invalid_argument("x is outside of the interpolatable range.");
 }
 
 
@@ -141,8 +159,8 @@ double interpolate2d(const std::vector<double> &X, const std::vector<double> &Y,
         }
     }
 
-    // x,y is not in the range spanned by X and Y so cannot interpolate
-    return NAN;
+    // (x,y) is not in the range spanned by X and Y so cannot interpolate
+    throw std::invalid_argument("(x,y) is outside of the interpolatable range.");
 }
 
 
@@ -154,7 +172,14 @@ double integrate_inverse(const std::vector<double> &X, const std::vector<double>
 
     double result = 0.0;
     for (size_t j = 0; j < X.size()-1; j++) {
-        if (x0 <= X[j] && X[j+1] <= x1) {
+        if (X[j+1] <= x0) {
+            continue;
+        }
+        else if (X[j] >= x1) {
+            break;
+        }
+
+        else if (x0 <= X[j] && X[j+1] <= x1) {
             result += (1/Y[j]+1/Y[j+1]) /2 *(X[j+1]-X[j]);
         }
         else if (X[j] < x0 && x0 < X[j+1]) {
@@ -169,10 +194,6 @@ double integrate_inverse(const std::vector<double> &X, const std::vector<double>
 
     return result;
 }
-
-
-
-
 
 
 // convert a std::vector<double> to a Vector<-1>
@@ -200,6 +221,23 @@ Matrix<-1> convert_matrix(const std::vector<std::vector<double>> &mat) {
     return ret_mat;
 }
 
+
+// convert a std::vector<std::vector<double>> to a NonSquareMatrix<-1,-1>
+NonSquareMatrix<-1,-1> convert_nonsquarematrix(const std::vector<std::vector<double>> &mat) {
+    NonSquareMatrix<-1,-1> ret_mat;
+    if (mat.size() == 0) {
+        ret_mat.resize(0, 0);
+        return ret_mat;
+    }
+    ret_mat.resize(mat.size(), mat[0].size());
+    for (size_t i = 0; i < mat.size(); i++) {
+        for (size_t j = 0; j < mat[0].size(); j++) {
+            ret_mat(i,j) = mat[i].at(j);
+        }
+    }
+
+    return ret_mat;
+}
 
 
 #endif //UTILS_H_INCLUDED
