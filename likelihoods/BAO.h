@@ -103,17 +103,17 @@ public:
         double d_c;
         for (int j = 0; j < z_1_.size(); j++) {
             d_c = interpolate(z_D_C, D_C_comp, z_1_[j]);
-            angle_1(j) = pow((z_1_[j] *d_c *d_c /interpolate(z_H, H_comp, z_1_[j])), 1/3) /r_s;
+            angle_1(j) = cbrt(z_1_[j] *d_c *d_c *PHYS_C/interpolate(z_H, H_comp, z_1_[j])) /r_s;
         }
         // calculate predicted angles for type 2 measurements
         Vector<-1> angle_2(z_2_.size());
         for (int j = 0; j < z_2_.size(); j++) {
-            angle_2(j) = interpolate(z_D_C, D_C_comp, z_2_[j]) /(1.0 + z_2_[j]) /r_s;
+            angle_2(j) = interpolate(z_D_C, D_C_comp, z_2_[j]) /r_s;
         }
         // calculate predicted angles for type 3 measurements
         Vector<-1> angle_3(z_3_.size());
         for (int j = 0; j < z_3_.size(); j++) {
-            angle_3(j) = 1 /interpolate(z_H, H_comp, z_3_[j]) /r_s;
+            angle_3(j) = PHYS_C/interpolate(z_H, H_comp, z_3_[j]) /r_s;
         }
 
         // calculate all angle residuals

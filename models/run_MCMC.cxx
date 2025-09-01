@@ -27,7 +27,7 @@ double GetH(Vector<0> state, double z, Vector<3> params) {
     double H0 = params(0);
     double Om0 = params(1);
     double a = 1/(1.0+z);
-    return H0 * sqrt(Om0/a + Or0/a/a + (1-Om0-Or0)*a*a);
+    return H0 * sqrt(Om0/a/a/a + Or0/a/a/a/a + (1-Om0-Or0));
 }
 
 

@@ -68,7 +68,7 @@ public:
         // interpolate the comoving distance and calculate the predicted magnitudes
         Vector<-1> m(z_.size());
         for (int j = 0; j < z_.size(); j++) {
-            m(j) = 5 * log10((1.0 + z_[j]) * interpolate(z_D_C, D_C_comp, z_[j])) + 25.0 + M;
+            m(j) = 5 * log10(interpolate(z_D_C, D_C_comp, z_[j])) + 25.0 + M;
         }
         // calculate the magnitude residuals
         Vector<-1> signal_residuals = m - m_;

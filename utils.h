@@ -22,7 +22,7 @@ using NonSquareMatrix = Eigen::Matrix<double, N, K>;
 
 
 // speed of light in km/s
-double c = 299792.458;
+const double PHYS_C = 299792.458;
 
 
 void save_vector_as_txt(const std::vector<double> &vec, fs::path path, unsigned int save_every = 1) {

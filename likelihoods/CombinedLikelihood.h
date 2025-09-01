@@ -22,7 +22,8 @@ class CombinedLikelihood {
 public:
     CombinedLikelihood(std::vector<std::shared_ptr<LikelihoodBase<N>>> likelihoods,
         std::function<Vector<D>(const Vector<D> &, double, const Vector<N> &)> model, Vector<D> y0,
-        std::function<double(const Vector<D> &, double, const Vector<N> &)> get_H_z)
+        std::function<double(const Vector<D> &, double, const Vector<N> &)> get_H_z,
+        double dz_max = 0.0001)
         :
         likelihoods_(likelihoods),
         model_(model),
@@ -38,7 +39,6 @@ public:
         sort(z_H_tmp);
 
         // insert filler values where distance too large
-        double dz_max = 0.01;
         for (size_t j = 1; j < z_H_tmp.size(); j++) {
             double dz_init = z_H_tmp[j] - z_H_tmp[j-1];
 
@@ -82,12 +82,12 @@ public:
             H_comp.push_back(get_H_z_(solver.GetCurrentValue(), z_H_[j], params));
         }
 
-        // integrate 1/H to give D_C
+        // integrate c/H to give D_C
         std::vector<double> D_C_comp;
         if (z_D_C_.size() > 0) {
-            D_C_comp.push_back(z_H_[0]/H_comp[0] + integrate_inverse(z_H_, H_comp, z_H_[0], z_D_C_[0]));
+            D_C_comp.push_back(z_H_[0] *PHYS_C/H_comp[0] + PHYS_C*integrate_inverse(z_H_, H_comp, z_H_[0], z_D_C_[0]));
             for (size_t j = 1; j < z_D_C_.size(); j++) {
-                D_C_comp.push_back(D_C_comp.back() + integrate_inverse(z_H_, H_comp, z_D_C_[j-1], z_D_C_[j]));
+                D_C_comp.push_back(D_C_comp.back() + PHYS_C*integrate_inverse(z_H_, H_comp, z_D_C_[j-1], z_D_C_[j]));
             }
         }
 
