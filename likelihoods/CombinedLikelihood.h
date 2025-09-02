@@ -21,13 +21,14 @@ class CombinedLikelihood {
 
 public:
     CombinedLikelihood(std::vector<std::shared_ptr<LikelihoodBase<N>>> likelihoods,
-        std::function<Vector<D>(const Vector<D> &, double, const Vector<N> &)> model, Vector<D> y0,
+        std::function<Vector<D>(const Vector<D> &, double, const Vector<N> &)> model,
+        std::function<Vector<D>(const Vector<N> &)> get_y0,
         std::function<double(const Vector<D> &, double, const Vector<N> &)> get_H_z,
         double dz_max = 0.0001)
         :
         likelihoods_(likelihoods),
         model_(model),
-        y0_(y0),
+        get_y0_(get_y0),
         get_H_z_(get_H_z)
         {
 
@@ -74,7 +75,8 @@ public:
             return model_(y, z, params);
         };
         // RK4 numerical solver of D dimensional differential equations
-        RK4<D> solver(func, y0_, 0.0);
+        Vector<D> y0 = get_y0_(params);
+        RK4<D> solver(func, y0, 0.0);
         // get the H values from the solver
         std::vector<double> H_comp;
         for (size_t j = 0; j < z_H_.size(); j++) {
@@ -109,7 +111,7 @@ private:
     // the cosmological model dy/dz = f(y,z, params)
     std::function<Vector<D>(const Vector<D> &, double, const Vector<N> &)> model_;
     // the starting point for the solver y(0)
-    Vector<D> y0_;
+    std::function<Vector<D>(const Vector<N> &)> get_y0_;
     // the function giving H(z) in terms of the solved model, the redshift and the MCMC parameters
     std::function<double(const Vector<D> &, double, const Vector<N> &)> get_H_z_;
 
