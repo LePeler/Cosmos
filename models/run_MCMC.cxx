@@ -48,6 +48,7 @@ int main(int argc, char* argv[]) {
 
 
     // DotProgressBar progress_bar(K, "step(s)", int(K/100), 70);
+    return 0;
 }
 
 

@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include <omp.h>
+#include <mpi.h>
 
 #include <utils.h>
 
@@ -21,8 +22,10 @@ class MCMC_base {
 
 public:
     // constructor
-    MCMC_base(std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha)
+    MCMC_base(int proc, int num_procs, std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha)
         :
+        proc_(proc),
+        num_procs_(num_procs),
         lnP_(lnP),
         states_(init_states),
         num_iters_(0),
@@ -30,18 +33,65 @@ public:
         alpha_(alpha),
         dist01_(0.0, 1.0)
     {
+        // walker range that belongs to this process
+        walkers_per_proc_ = W /num_procs;
+        start_ = walkers_per_proc_ *proc;
+        stop_ = walkers_per_proc_ *(proc+1);
+
         // calculate initial logprobs
-        for (unsigned int w = 0; w < W; w++) {
+        for (unsigned int w = start_; w < stop_; w++) {
             logprobs_[w] = lnP_(states_[w]);
         }
+        // broadcast logprobs
+        Broadcast(logprobs_);
 
-        // append initial states and logprobs to the sample
-        sample_.push_back(states_);
-        sample_logprobs_.push_back(logprobs_);
+        // append initial states and logprobs to the sample (only on main process)
+        if (proc_ == 0) {
+            sample_.push_back(states_);
+            sample_logprobs_.push_back(logprobs_);
+        }
     }
 
     // destructor
     ~MCMC_base() = default;
+
+    // broadcast a std::array<Vector<N>, W> (e.g. the walker states) over all processes
+    void Broadcast(std::array<Vector<N>, W> &vec_arr) {
+        // flatten the std::array<Vector<N>, W>
+        std::array<double, W*N> flattened;
+        for (unsigned int w = 0; w < W; w++) {
+            for (int n = 0; n < N; n++) {
+                flattened[w*N+n] = vec_arr[w](n);
+            }
+        }
+
+        // broadcast the flattened array
+        unsigned int start;
+        unsigned int stop;
+        for (unsigned int proc = 0; proc < num_procs_; proc++) {
+            start = walkers_per_proc_ *proc;
+            stop = walkers_per_proc_ *(proc+1);
+            MPI_Bcast(&flattened[start*N], (stop-start)*N, MPI_DOUBLE, proc, MPI_COMM_WORLD);
+        }
+
+        // reconstruct the std::array<Vector<N>, W>
+        for (unsigned int w = 0; w < W; w++) {
+            for (int n = 0; n < N; n++) {
+                vec_arr[w](n) = flattened[w*N+n];
+            }
+        }
+    }
+
+    // broadcast a std::array<double, W> (e.g. the logprobs) over all processes
+    void Broadcast(std::array<double, W> &arr) {
+        unsigned int start;
+        unsigned int stop;
+        for (unsigned int proc = 0; proc < num_procs_; proc++) {
+            start = walkers_per_proc_ *proc;
+            stop = walkers_per_proc_ *(proc+1);
+            MPI_Bcast(&arr[start], stop-start, MPI_DOUBLE, proc, MPI_COMM_WORLD);
+        }
+    }
 
     // get the current walker states
     std::array<Vector<N>, W> GetStates() const {
@@ -194,10 +244,12 @@ public:
 
     // reset the members (i.e. sample, logprobs and counters)
     void Reset() {
-        sample_ = {states_};
-        sample_logprobs_ = {logprobs_};
-        num_iters_ = 0;
-        num_accepted_ = 0;
+        if (proc_ == 0) {
+            sample_ = {states_};
+            sample_logprobs_ = {logprobs_};
+            num_iters_ = 0;
+            num_accepted_ = 0;
+        }
     }
 
     // make an iteration of the respective MCMC algorithm
@@ -206,42 +258,53 @@ public:
         ComputeIter();
 
         // append new states and logprobs to the sample
-        sample_.push_back(states_);
-        sample_logprobs_.push_back(logprobs_);
+        if (proc_ == 0) {
+            sample_.push_back(states_);
+            sample_logprobs_.push_back(logprobs_);
+        }
     }
 
-    // savd the sample to a txt file
+    // save the sample to a txt file
     void SaveSample(fs::path path, bool overwrite = false) {
-        // check that the out file doesn't exist yet if overwrite is disabled
-        if (!overwrite && fs::exists(path)) {
-            throw std::runtime_error(("The path \"" + path.string() + "\" already exists and must not be overwritten.").c_str());
-        }
-
-        // open the file
-        std::ofstream file;
-        file.open(path);
-        if (!file) {
-            throw std::runtime_error(("Could not open \"" + path.string() + "\".").c_str());
-        }
-
-        // write the sample
-        for (size_t j = 0; j < sample_.size(); j++) {
-            for (unsigned int w = 0; w < W; w++) {
-                for (int n = 0; n < N; n++) {
-                    file << sample_[j][w](n) << ", ";
-                }
-                file << sample_logprobs_[j][w] << "\n";
+        if (proc_ == 0) {
+            // check that the out file doesn't exist yet if overwrite is disabled
+            if (!overwrite && fs::exists(path)) {
+                throw std::runtime_error(("The path \"" + path.string() + "\" already exists overwrite is set to false.").c_str());
             }
-            file << "\n";
-        }
 
-        // close the file
-        file.close();
+            // open the file
+            std::ofstream file;
+            file.open(path);
+            if (!file) {
+                throw std::runtime_error(("Could not open \"" + path.string() + "\".").c_str());
+            }
+
+            // write the sample
+            for (size_t j = 0; j < sample_.size(); j++) {
+                for (unsigned int w = 0; w < W; w++) {
+                    for (int n = 0; n < N; n++) {
+                        file << sample_[j][w](n) << ", ";
+                    }
+                    file << sample_logprobs_[j][w] << "\n";
+                }
+                file << "\n";
+            }
+
+            // close the file
+            file.close();
+        }
     }
 
 
 protected:
-    // log-likelyhood function
+    // MPI: process number and number of total processes
+    int proc_;
+    int num_procs_;
+    double walkers_per_proc_;
+    unsigned int start_;
+    unsigned int stop_;
+
+    // log-likelihood function
     std::function<double(const Vector<N> &)> lnP_;
 
     // current states of the walkers
@@ -273,13 +336,13 @@ protected:
 
     // compute an iteration of the respective MCMC algorithm
     void ComputeIter() {
-        num_iters_++;
+        unsigned int accepted = 0;
 
         // update sampler members
         UpdateInternals();
 
         #pragma omp parallel for
-        for (unsigned int w = 0; w < W; w++) {
+        for (unsigned int w = start_; w < stop_; w++) {
 
             // each thread gets its own RNG
             thread_local static std::mt19937 randgen(std::random_device{}());
@@ -302,8 +365,25 @@ protected:
                 logprobs_[w] = new_logprob;
 
                 #pragma omp atomic
-                num_accepted_++;
+                accepted++;
             }
+        }
+
+        // broadcast states and logprobs
+        Broadcast(states_);
+        Broadcast(logprobs_);
+
+        // update counters
+        if (proc_ == 0) {
+            num_iters_++;
+            num_accepted_ += accepted;
+            for (int proc = 1; proc < num_procs_; proc++) {
+                MPI_Recv(&accepted, 1, MPI_UNSIGNED, proc, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                num_accepted_ += accepted;
+            }
+        }
+        else {
+            MPI_Send(&accepted, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD);
         }
     }
 };

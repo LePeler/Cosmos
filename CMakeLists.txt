@@ -9,6 +9,8 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(Eigen3 REQUIRED)
 # find OpenMP
 find_package(OpenMP REQUIRED)
+# find MPI
+find_package(MPI REQUIRED)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
@@ -38,6 +40,7 @@ add_executable(cosmos_test
 )
 target_link_libraries(cosmos_test PRIVATE cosmos)
 target_link_libraries(cosmos_test PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(cosmos_test PRIVATE MPI::MPI_CXX)
 
 # MCMC executable
 add_executable(test_MCMC
@@ -45,3 +48,4 @@ add_executable(test_MCMC
 )
 target_link_libraries(test_MCMC PRIVATE cosmos)
 target_link_libraries(test_MCMC PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(test_MCMC PRIVATE MPI::MPI_CXX)

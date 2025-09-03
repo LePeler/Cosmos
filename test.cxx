@@ -20,12 +20,12 @@ double log_gauss(const Vector<1> &state) {
 
 
 int main(int argc, char* argv[]) {
+    MPI_Init(&argc, &argv);
 
-    #pragma omp parallel
-    {
-        #pragma omp single
-        std::cout << "Threads used: " << omp_get_num_threads() << "\n";
-    }
+    int proc;
+    int num_procs;
+    MPI_Comm_rank(MPI_COMM_WORLD, &proc);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
     std::array<Vector<1>, 10> init_states;
     init_states[0] = Vector<1>{0.1};
@@ -39,24 +39,30 @@ int main(int argc, char* argv[]) {
     init_states[8] = Vector<1>{0.07};
     init_states[9] = Vector<1>{0.85};
 
-    MCMC2<1, 10> sampler(log_gauss, init_states, 0.3, 2);
+    MCMC2<1, 10> sampler(proc, num_procs, log_gauss, init_states, 0.3, 2);
 
     unsigned int K = 100000;
     DotProgressBar progress_bar(K, "iter(s)", int(K/100), 70);
 
     for (unsigned int k = 0; k < K; k++) {
         sampler.MakeIter();
-        progress_bar.step();
-        //std::cout << "mean = " << sampler.GetStateMean() << std::endl;
-        //std::cout << "variance = " << sampler.GetStateVariance() << std::endl;
-        std::cout << "autocorr time = " << sampler.GetIntegAutocorrTime() << std::endl;
-        //std::cout << std::endl;
+        if (proc == 0) {
+            progress_bar.step();
+            //std::cout << "mean = " << sampler.GetStateMean() << std::endl;
+            //std::cout << "variance = " << sampler.GetStateVariance() << std::endl;
+            //std::cout << "autocorr time = " << sampler.GetIntegAutocorrTime() << std::endl;
+            //std::cout << std::endl;
+        }
     }
-
-    std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
+    if (proc == 0) {
+        std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
+    }
 
     fs::path out_path("/home/aurora/sim_results/MCMC_test.txt");
     sampler.SaveSample(out_path, true);
+
+    MPI_Finalize();
+    return 0;
 }
 
 

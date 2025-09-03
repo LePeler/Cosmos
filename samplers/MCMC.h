@@ -15,9 +15,9 @@ class MCMC : public MCMC_base<N, W> {
 
 public:
     // constructor
-    MCMC(std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha, double beta = 2)
+    MCMC(int proc, int num_procs, std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha, double beta = 2)
         :
-        MCMC_base<N, W>(lnP, init_states, alpha),
+        MCMC_base<N, W>(proc, num_procs, lnP, init_states, alpha),
         beta_(beta),
         dist0W2_(0, W-2)
     {}
