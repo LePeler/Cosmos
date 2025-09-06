@@ -21,12 +21,14 @@ class CombinedLikelihood {
 
 public:
     CombinedLikelihood(std::vector<std::shared_ptr<LikelihoodBase<N>>> likelihoods,
+        std::function<bool(const Vector<N> &)> prior,
         std::function<Vector<D>(const Vector<D> &, double, const Vector<N> &)> model,
         std::function<Vector<D>(const Vector<N> &)> get_y0,
         std::function<double(const Vector<D> &, double, const Vector<N> &)> get_H_z,
         double dz_max = 0.0001)
         :
         likelihoods_(likelihoods),
+        prior_(prior),
         model_(model),
         get_y0_(get_y0),
         get_H_z_(get_H_z)
@@ -70,6 +72,11 @@ public:
 
     // evaluate the combined log-likelihood at a set of MCMC parameters
     double log_likelihood(const Vector<N> &params) {
+        // check prior
+        if (!prior_(params)) {
+            return -INFINITY;
+        }
+
         // evaluate model at the given parameters
         std::function<Vector<D>(Vector<D>, double)> func = [this, params](Vector<D> y, double z) {
             return model_(y, z, params);
@@ -107,6 +114,8 @@ public:
 private:
     // the individual likelihoods
     std::vector<std::shared_ptr<LikelihoodBase<N>>> likelihoods_;
+    // the prior to check whether the parameters are valid
+    std::function<bool(const Vector<N> &)> prior_;
 
     // the cosmological model dy/dz = f(y,z, params)
     std::function<Vector<D>(const Vector<D> &, double, const Vector<N> &)> model_;

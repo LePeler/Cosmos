@@ -15,14 +15,13 @@ class MCMC2 : public MCMC_base<N, W> {
 
 public:
     // constructor
-    MCMC2(int proc, int num_procs, std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha, double beta = 1)
+    MCMC2(int proc, int num_procs, std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha, double beta = 1.0)
         :
         MCMC_base<N, W>(proc, num_procs, lnP, init_states, alpha),
         beta_(beta),
         Mu_(Vector<N>::Zero()),
         Var_(Matrix<N>::Identity()),
         L_(Matrix<N>::Identity()),
-        Zinv_(1.0),
         distN01_(0.0, 1.0)
     {}
 
@@ -40,8 +39,6 @@ private:
     Matrix<N> Var_;
     // Cholesky decomposition of the scaled variance matrix
     Matrix<N> L_;
-    // the normalization for the new state pdf
-    double Zinv_;
 
     // normal distribution with mu=0 and sigma=1
     std::normal_distribution<double> distN01_;
@@ -51,7 +48,6 @@ private:
         Mu_ = this->GetStateMean();
         Var_ = this->GetStateVariance(Mu_);
         L_ = beta_ * (Var_.llt().matrixL().toDenseMatrix());
-        Zinv_ = 1/pow(2*M_PI, N/2)/L_.determinant();
     }
 
     // sample a new state for walker w and also return the associated pdf value
@@ -65,7 +61,7 @@ private:
 
         return std::make_pair(
             Mu_ + (L_.template triangularView<Eigen::Lower>()) * z,
-            Zinv_ * exp(-z.dot(z) /beta_/beta_ /2)
+            exp(-z.dot(z) /2)
         );
     }
 };

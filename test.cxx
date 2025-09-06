@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
     init_states[8] = Vector<1>{0.07};
     init_states[9] = Vector<1>{0.85};
 
-    MCMC2<1, 10> sampler(proc, num_procs, log_gauss, init_states, 0.3, 2);
+    MCMC<1, 10> sampler(proc, num_procs, log_gauss, init_states, 0.05, 2);
 
     unsigned int K = 100000;
     DotProgressBar progress_bar(K, "iter(s)", int(K/100), 70);

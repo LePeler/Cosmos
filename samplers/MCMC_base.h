@@ -44,12 +44,6 @@ public:
         }
         // broadcast logprobs
         Broadcast(logprobs_);
-
-        // append initial states and logprobs to the sample (only on main process)
-        if (proc_ == 0) {
-            sample_.push_back(states_);
-            sample_logprobs_.push_back(logprobs_);
-        }
     }
 
     // destructor
@@ -99,142 +93,68 @@ public:
     }
 
     // get the entire sample
-    std::vector<std::array<Vector<N>, W>> GetSample() const {
+    std::array<std::vector<Vector<N>>, W> GetSample() const {
         return sample_;
     }
 
     // get the state mean
-    Vector<N> GetStateMean(const std::array<Vector<N>, W> &states) const {
-        Vector<N> result = Vector<N>::Zero();
-        for (unsigned int w = 0; w < W; w++) {
-            result += states[w];
-        }
-        result /= W;
-
-        return result;
-    }
-
-    // GetStateMean(states_)
     Vector<N> GetStateMean() const {
-        return GetStateMean(states_);
-    }
-
-    // get the sample mean
-    Vector<N> GetSampleMean() const {
         Vector<N> result = Vector<N>::Zero();
-        for (const std::array<Vector<N>, W> &states : sample_) {
-            result += GetStateMean(states);
-        }
-        result /= sample_.size();
-
-        return result;
-    }
-
-    // get the covariance between two sets of walker states
-    Matrix<N> GetStatesCovariance(const std::array<Vector<N>, W> &states1, const std::array<Vector<N>, W> &states2, const Vector<N> &mean1, const Vector<N> &mean2) const {
-        Matrix<N> result = Matrix<N>::Zero();
         for (unsigned int w = 0; w < W; w++) {
-            result += (states1[w]-mean1)*(states2[w]-mean2).transpose();
+            result += states_[w];
         }
         result /= W;
 
         return result;
-    }
-
-    // GetStatesCovariance(states1, states2, GetStateMean(states1), GetStateMean(states2))
-    Matrix<N> GetStatesCovariance(const std::array<Vector<N>, W> &states1, const std::array<Vector<N>, W> &states2) const {
-        return GetStatesCovariance(states1, states2, GetStateMean(states1), GetStateMean(states2));
     }
 
     // get the state variance matrix
-    Matrix<N> GetStateVariance(const std::array<Vector<N>, W> &states, const Vector<N> &mean) const {
-        return GetStatesCovariance(states, states, mean, mean);
-    }
-
-    // GetStateVariance(states, GetStateMean(states))
-    Matrix<N> GetStateVariance(const std::array<Vector<N>, W> &states) const {
-        return GetStateVariance(states, GetStateMean(states));
-    }
-
-    // GetStateVariance(states_, mean)
     Matrix<N> GetStateVariance(const Vector<N> &mean) const {
-        return GetStateVariance(states_, mean);
-    }
-
-    // GetStateVariance(states_)
-    Matrix<N> GetStateVariance() const {
-        return GetStateVariance(states_);
-    }
-
-    // get the sample lag-k covariance matrix
-    Matrix<N> GetSampleLagKCovariance(unsigned int k, const Vector<N> &mean) const {
         Matrix<N> result = Matrix<N>::Zero();
-        for (size_t j = 0; j < sample_.size()-k; j++) {
-            result += GetStatesCovariance(sample_[j], sample_[j+k], mean, mean);
+        for (unsigned int w = 0; w < W; w++) {
+            result += (states_[w]-mean)*(states_[w]-mean).transpose();
         }
-        result /= sample_.size();
+        result /= (W-1);
 
         return result;
     }
 
-    // GetSampleLagKCovariance(k, GetSampleMean())
-    Matrix<N> GetSampleLagKCovariance(unsigned int k) const {
-        return GetSampleLagKCovariance(k, GetSampleMean());
+    // GetStateVariance(GetStateMean())
+    Matrix<N> GetStateVariance() const {
+        return GetStateVariance(GetStateMean());
     }
 
-    // get the sample variance matrix
-    Matrix<N> GetSampleVariance(const Vector<N> &mean) const {
-        return GetSampleLagKCovariance(0, mean);
-    }
-
-    // GetSampleVariance(GetSampleMean())
-    Matrix<N> GetSampleVariance() const {
-        return GetSampleVariance(GetSampleMean());
-    }
-
-    // get the sample covariance matrix and the integrated autocorrelation time
-    std::pair<Matrix<N>, double> GetSampleCovarianceAndIntegAutocorrTime(const Vector<N> &mean) const {
-        Matrix<N> result = GetSampleVariance(mean);
-        double det_var = result.determinant();
-        Matrix<N> lag_k;
-        double tau = 1.0;
-        for (unsigned int k = 1; k < sample_.size()/2; k++) {
-            lag_k = GetSampleLagKCovariance(k, mean);
-            result += lag_k + lag_k.transpose();
-
-            tau = pow(result.determinant()/det_var, 1/N);
-            if (k > 5*tau) {
-                break;
-            }
+    // get a rank-normalized and folded split-RHat measure to assess chain convergence
+    // and get the effective sample size (as determined by the sample covariance) 
+    // (both adapted from https://arxiv.org/pdf/1903.08008)
+    std::pair<double, double> GetRHatAndESS(size_t L) const {
+        // split each chain in two halves
+        std::array<std::vector<Vector<N>>, 2*W> split_sample;
+        for (unsigned int w = 0; w < W; w++) {
+            split_sample[2*w] = std::vector<Vector<N>>(sample_[w].end() - L, sample_[w].end() - L + L/2);
+            split_sample[2*w+1] = std::vector<Vector<N>>(sample_[w].end() - L/2, sample_[w].end());
         }
 
-        return std::make_pair(result, tau);
+        // get the RHat and ESS for the rank normalized split-chains
+        std::pair<double, double> RHat_and_ESS = ComputeRHatAndESS(RankNormalize(split_sample));
+
+        // fold each split-chain about its median
+        std::array<std::vector<Vector<N>>, 2*W> folded_split_sample;
+        for (unsigned int w = 0; w < 2*W; w++) {
+            folded_split_sample[w] = Fold(split_sample[w]);
+        }
+
+        // get the RHat and ESS for the rank normalized folded split-chains
+        std::pair<double, double> folded_RHat_and_ESS = ComputeRHatAndESS(RankNormalize(folded_split_sample));
+
+        // return the maximum of the two RHats and the minimum of the two ESSs
+        return std::make_pair(std::max(RHat_and_ESS.first, folded_RHat_and_ESS.first),
+                                std::min(RHat_and_ESS.second, folded_RHat_and_ESS.second));
     }
 
-    // GetSampleCovarianceAndIntegAutocorrTime(GetSampleMean())
-    std::pair<Matrix<N>, double> GetSampleCovarianceAndIntegAutocorrTime() const {
-        return GetSampleCovarianceAndIntegAutocorrTime(GetSampleMean());
-    }
-
-    // get the sample covariance matrix
-    Matrix<N> GetSampleCovariance(const Vector<N> &mean) const {
-        return GetSampleCovarianceAndIntegAutocorrTime(mean).first;
-    }
-
-    // GetSampleCovariance(GetSampleMean())
-    Matrix<N> GetSampleCovariance() const {
-        return GetSampleCovariance(GetSampleMean());
-    }
-
-    // get the integrated autocorrelation time
-    double GetIntegAutocorrTime(const Vector<N> &mean) const {
-        return GetSampleCovarianceAndIntegAutocorrTime(mean).second;
-    }
-
-    // GetIntegAutocorrTime(GetSampleMean())
-    double GetIntegAutocorrTime() const {
-        return GetIntegAutocorrTime(GetSampleMean());
-
+    // GetRHatAndESS on the entire available sample
+    std::pair<double, double> GetRHatAndESS() const {
+        return GetRHatAndESS(sample_[0].size());
     }
 
     // get the fraction of new state samples that have been accepted
@@ -243,12 +163,14 @@ public:
     }
 
     // reset the members (i.e. sample, logprobs and counters)
-    void Reset() {
+    void Reset(size_t keep = 0) {
         if (proc_ == 0) {
-            sample_ = {states_};
-            sample_logprobs_ = {logprobs_};
-            num_iters_ = 0;
-            num_accepted_ = 0;
+            for (unsigned int w = 0; w < W; w++) {
+                sample_[w] = std::vector<Vector<N>>(sample_[w].end() - keep, sample_[w].end());
+                sample_logprobs_[w] = std::vector<double>(sample_logprobs_[w].end() - keep, sample_logprobs_[w].end());
+            }
+            num_accepted_ *= keep/num_iters_;
+            num_iters_ = keep;
         }
     }
 
@@ -259,8 +181,10 @@ public:
 
         // append new states and logprobs to the sample
         if (proc_ == 0) {
-            sample_.push_back(states_);
-            sample_logprobs_.push_back(logprobs_);
+            for (unsigned int w = 0; w < W; w++) {
+                sample_[w].push_back(states_[w]);
+                sample_logprobs_[w].push_back(logprobs_[w]);
+            }
         }
     }
 
@@ -280,12 +204,12 @@ public:
             }
 
             // write the sample
-            for (size_t j = 0; j < sample_.size(); j++) {
-                for (unsigned int w = 0; w < W; w++) {
+            for (unsigned int w = 0; w < W; w++) {
+                for (size_t j = 0; j < sample_[w].size(); j++) {
                     for (int n = 0; n < N; n++) {
-                        file << sample_[j][w](n) << ", ";
+                        file << sample_[w][j](n) << ", ";
                     }
-                    file << sample_logprobs_[j][w] << "\n";
+                    file << sample_logprobs_[w][j] << "\n";
                 }
                 file << "\n";
             }
@@ -312,9 +236,9 @@ protected:
     // the logprobs of the current states
     std::array<double, W> logprobs_;
     // the entire sample
-    std::vector<std::array<Vector<N>, W>> sample_;
+    std::array<std::vector<Vector<N>>, W> sample_;
     // the logprobs of the sample
-    std::vector<std::array<double, W>> sample_logprobs_;
+    std::array<std::vector<double>, W> sample_logprobs_;
     // number of performed iterations
     size_t num_iters_;
     // number of accepted new states
@@ -325,6 +249,129 @@ protected:
 
     // uniform double distribution from 0 to 1
     std::uniform_real_distribution<double> dist01_;
+
+    // rank-normalize the chains
+    std::array<std::vector<Vector<N>>, 2*W> RankNormalize(const std::array<std::vector<Vector<N>>, 2*W> &chains) const {
+        size_t L = chains[0].size();
+        size_t S = L*2*W;
+        // flatten the chains for each component
+        std::array<std::vector<double>, N> flattened_chains;
+        for (unsigned int w = 0; w < 2*W; w++) {
+            for (size_t j = 0; j < chains[w].size(); j++) {
+                for (int n = 0; n < N; n++) {
+                    flattened_chains[n].push_back(chains[w][j](n));
+                }
+            }
+        }
+        // sort the flattened chains
+        for (int n = 0; n < N; n++) {
+            sort(flattened_chains[n]);
+        }
+        // calculate the rank of each value and transform into a standard normal using the probit function
+        size_t rank;
+        std::array<std::vector<Vector<N>>, 2*W> rank_normalized_chains;
+        for (unsigned int w = 0; w < 2*W; w++) {
+            rank_normalized_chains[w].resize(chains[w].size());
+            for (size_t j = 0; j < chains[w].size(); j++) {
+                for (int n = 0; n < N; n++) {
+                    rank = get_index(chains[w][j](n), flattened_chains[n]) + 1;
+                    rank_normalized_chains[w][j](n) = probit((rank - 0.375) /(S + 0.25));
+                }
+            }
+        }
+
+        return rank_normalized_chains;
+    }
+
+    // fold the chain about its median
+    std::vector<Vector<N>> Fold(const std::vector<Vector<N>> &chain) const {
+        // extract the individual components of each chain
+        std::array<std::vector<double>, N> compwise_chains;
+        for (int n = 0; n < N; n++) {
+            for (size_t j = 0; j < chain.size(); j++) {
+                compwise_chains[n].push_back(chain[j](n));
+            }
+        }
+
+        // compute the componentwise median of the chain
+        Vector<N> chain_median;
+        for (int n = 0; n < N; n++) {
+            std::nth_element(compwise_chains[n].begin(), compwise_chains[n].begin() + compwise_chains[n].size()/2, compwise_chains[n].end());
+            chain_median(n) = compwise_chains[n][compwise_chains[n].size()/2];
+        }
+
+        // fold the chain abouth that median
+        std::vector<Vector<N>> folded_chain(chain.size());
+        for (size_t j = 0; j < chain.size(); j++) {
+            folded_chain[j] = (chain[j]-chain_median).array().abs();
+        }
+
+        return folded_chain;
+    }
+
+    // compute the classic RHat and ESS from the chains
+    std::pair<double, double> ComputeRHatAndESS(const std::array<std::vector<Vector<N>>, 2*W> &chains) const {
+        size_t L = chains[0].size();
+        // compute the chain means and variances and the global mean
+        std::array<Vector<N>, 2*W> chain_means;
+        for (unsigned int w = 0; w < 2*W; w++) {
+            chain_means[w] = get_mean(chains[w]);
+        }
+        std::array<double, 2*W> chain_vars;
+        for (unsigned int w = 0; w < 2*W; w++) {
+            chain_vars[w] = get_variance(chains[w], chain_means[w]);
+        }
+        Vector<N> global_mean = get_mean(chain_means);
+        // compute the between chain variance
+        double between = 0.0;
+        for (unsigned int w = 0; w < 2*W; w++) {
+            between += (chain_means[w] - global_mean).dot(chain_means[w] - global_mean);
+        }
+        between /= (2*W-1);
+        // compute the within chain variance
+        double within = 0.0;
+        for (unsigned int w = 0; w < 2*W; w++) {
+            within += chain_vars[w];
+        }
+        within /= 2*W;
+
+        // calculate the marginal posterior variance
+        double var_plus = (1-1/L)*within + between;
+
+        // compute RHat
+        double RHat = sqrt(var_plus /within);
+
+        // calculate the integrated autocorrelation time
+        double tau = 1.0;
+        double rho = INFINITY;
+        double rho_prev;
+        double numerator;
+        for (size_t k = 0; k < (L-1)/2; k++) {
+            numerator = 0.0;
+            // calculate lag 2k and 2k+1 autocorrelations
+            for (unsigned int w = 0; w < 2*W; w++) {
+                numerator -= get_lag_k_covariance(chains[w], 2*k, chain_means[w])
+                            + get_lag_k_covariance(chains[w], 2*k+1, chain_means[w]);
+            }
+            numerator /= 2*W;
+            numerator += 2*within;
+
+            rho_prev = rho;
+            rho = 2.0 - numerator / var_plus;
+            // only accept rhos as long as they are monotone descreasing and positive
+            if (rho < rho_prev && rho > 0) {
+                tau += 2*rho;
+            }
+            else {
+                break;
+            }
+        }
+
+        // compute the ESS
+        double ESS = L*2*W /tau;
+
+        return std::make_pair(RHat, ESS);
+    }
 
     // update the sampler members
     // does nothing by default
@@ -357,6 +404,7 @@ protected:
 
             // calculate acceptance probability
             double acceptance_prob = alpha_/new_state_prob * exp((new_logprob - logprobs_[w])/2);
+            //std::cout << acceptance_prob << " , " << new_state_prob << " , " << new_logprob - logprobs_[w] << std::endl;
 
             // accept or reject
             double rand01 = dist01_(randgen);
