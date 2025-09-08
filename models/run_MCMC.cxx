@@ -79,40 +79,56 @@ int main(int argc, char* argv[]) {
     std::function<double(const Vector<3> &)> log_likelihood = [&](const Vector<3> &params) {return combined_likelihood.log_likelihood(params);};
     MCMC2<3, W> sampler(proc, num_procs, log_likelihood, init_states, 1.0, 2.0);
 
-    std::cout << "running burn-in ..." << std::endl;
-
+    bool burn_in_done = false;
     // instantiate burn-in monitor
-    Monitor burn_in_monitor({"RHat", "ESS"},
-        [&]() {std::pair<double, double> RHat_and_ESS = sampler.GetRHatAndESS();
-            return std::vector<double>{RHat_and_ESS.first, RHat_and_ESS.second};},
-        {[](double RHat) {return (RHat < 1.03);}, [](double ESS) {return (ESS > 20*W);}}, 100);
+    std::shared_ptr<Monitor> burn_in_monitor = nullptr;
+    if (proc == 0) {
+        std::cout << "running burn-in ..." << std::endl;
+        burn_in_monitor = std::make_shared<Monitor>(
+            std::vector<std::string>{"RHat", "ESS"},
+            [&]() {std::pair<double, double> RHat_and_ESS = sampler.GetRHatAndESS();
+                    return std::vector<double>{RHat_and_ESS.first, RHat_and_ESS.second};},
+            std::vector<std::function<bool(double)>>{[](double RHat) {return (RHat < 1.03);},
+                                                     [](double ESS) {return (ESS > 20*W);}},
+            100);
+    }
 
     // run burn-in
     while (true) {
         sampler.MakeIter();
         if (proc == 0) {
-            if (burn_in_monitor()) {
-                break;
-            }
+            burn_in_done = burn_in_monitor->check();
+        }
+        MPI_Bcast(&burn_in_done, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+        if (burn_in_done) {
+            break;
         }
     }
     sampler.Reset();
 
-    std::cout << "running production ..." << std::endl;
-
-    // instantiate production_monitor
-    Monitor production_monitor({"RHat", "ESS"},
-        [&]() {std::pair<double, double> RHat_and_ESS = sampler.GetRHatAndESS();
-            return std::vector<double>{RHat_and_ESS.first, RHat_and_ESS.second};},
-        {[](double RHat) {return (RHat < 1.01);}, [](double ESS) {return (ESS > 100*W);}}, 100);
+    bool production_done = false;
+    // instantiate production monitor
+    std::shared_ptr<Monitor> production_monitor = nullptr;
+    if (proc == 0) {
+        std::cout << "running production ..." << std::endl;
+        production_monitor = std::make_shared<Monitor>(
+            std::vector<std::string>{"RHat", "ESS"},
+            [&]() {std::pair<double, double> RHat_and_ESS = sampler.GetRHatAndESS();
+                    return std::vector<double>{RHat_and_ESS.first, RHat_and_ESS.second};},
+            std::vector<std::function<bool(double)>>{[](double RHat) {return (RHat < 1.01);},
+                                                     [](double ESS) {return (ESS > 100*W);}},
+            100);
+        }
 
     // run MCMC production
     while (true) {
         sampler.MakeIter();
         if (proc == 0) {
-            if (production_monitor()) {
-                break;
-            }
+            production_done = production_monitor->check();
+        }
+        MPI_Bcast(&production_done, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+        if (production_done) {
+            break;
         }
     }
 

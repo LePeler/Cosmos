@@ -90,7 +90,7 @@ public:
     }
 
 
-    bool operator()() {
+    bool check() {
         _curr_iter += 1;
         if (_curr_iter % _check_interval) {
             return false;

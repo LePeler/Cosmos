@@ -51,28 +51,12 @@ public:
 
     // broadcast a std::array<Vector<N>, W> (e.g. the walker states) over all processes
     void Broadcast(std::array<Vector<N>, W> &vec_arr) {
-        // flatten the std::array<Vector<N>, W>
-        std::array<double, W*N> flattened;
-        for (unsigned int w = 0; w < W; w++) {
-            for (int n = 0; n < N; n++) {
-                flattened[w*N+n] = vec_arr[w](n);
-            }
-        }
-
-        // broadcast the flattened array
         unsigned int start;
         unsigned int stop;
         for (unsigned int proc = 0; proc < num_procs_; proc++) {
             start = walkers_per_proc_ *proc;
             stop = walkers_per_proc_ *(proc+1);
-            MPI_Bcast(&flattened[start*N], (stop-start)*N, MPI_DOUBLE, proc, MPI_COMM_WORLD);
-        }
-
-        // reconstruct the std::array<Vector<N>, W>
-        for (unsigned int w = 0; w < W; w++) {
-            for (int n = 0; n < N; n++) {
-                vec_arr[w](n) = flattened[w*N+n];
-            }
+            MPI_Bcast(vec_arr[start].data(), (stop-start)*N, MPI_DOUBLE, proc, MPI_COMM_WORLD);
         }
     }
 
@@ -314,25 +298,20 @@ protected:
         size_t L = chains[0].size();
         // compute the chain means and variances and the global mean
         std::array<Vector<N>, 2*W> chain_means;
-        for (unsigned int w = 0; w < 2*W; w++) {
-            chain_means[w] = get_mean(chains[w]);
-        }
         std::array<double, 2*W> chain_vars;
         for (unsigned int w = 0; w < 2*W; w++) {
+            chain_means[w] = get_mean(chains[w]);
             chain_vars[w] = get_variance(chains[w], chain_means[w]);
         }
         Vector<N> global_mean = get_mean(chain_means);
-        // compute the between chain variance
+        // compute the between and within chain variances
         double between = 0.0;
-        for (unsigned int w = 0; w < 2*W; w++) {
-            between += (chain_means[w] - global_mean).dot(chain_means[w] - global_mean);
-        }
-        between /= (2*W-1);
-        // compute the within chain variance
         double within = 0.0;
         for (unsigned int w = 0; w < 2*W; w++) {
+            between += (chain_means[w] - global_mean).dot(chain_means[w] - global_mean);
             within += chain_vars[w];
         }
+        between /= (2*W-1);
         within /= 2*W;
 
         // calculate the marginal posterior variance
