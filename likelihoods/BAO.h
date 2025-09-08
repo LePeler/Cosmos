@@ -76,6 +76,10 @@ public:
         std::vector<std::vector<double>> inv_cov_mix31_tmp = read_txt(data_dir / fs::path("BAO_inv_cov_mix31.txt"), ',');
         inv_cov_mix31_ = convert_nonsquarematrix(inv_cov_mix31_tmp);
 
+        LT_1_ = inv_cov_1_.llt().matrixU();
+        LT_2_ = inv_cov_2_.llt().matrixU();
+        LT_3_ = inv_cov_3_.llt().matrixU();
+
         // read in R_drag values for interpolation
         for (const std::vector<double> &datapoint : read_txt(data_dir / fs::path("BAO_R_drag_H0.txt"), ',')) {
             R_drag_H0_.push_back(datapoint.at(0));
@@ -99,21 +103,23 @@ public:
         double r_s = interpolate2d(R_drag_H0_, R_drag_Om_, R_drag_grid_, params(H0_idx_), params(Om_idx_));
 
         // calculate predicted angles for type 1 measurements
+        std::vector<double> H_vals_1 = find_corresponding(z_H, H_comp, z_1_);
+        std::vector<double> D_C_vals_1 = find_corresponding(z_D_C, D_C_comp, z_1_);
         Vector<-1> angle_1(z_1_.size());
-        double d_c;
         for (int j = 0; j < z_1_.size(); j++) {
-            d_c = interpolate(z_D_C, D_C_comp, z_1_[j]);
-            angle_1(j) = cbrt(z_1_[j] *d_c *d_c *PHYS_C/interpolate(z_H, H_comp, z_1_[j])) /r_s;
+            angle_1(j) = cbrt(z_1_[j] *D_C_vals_1[j] *D_C_vals_1[j] *PHYS_C/H_vals_1[j]) /r_s;
         }
         // calculate predicted angles for type 2 measurements
+        std::vector<double> D_C_vals_2 = find_corresponding(z_D_C, D_C_comp, z_2_);
         Vector<-1> angle_2(z_2_.size());
         for (int j = 0; j < z_2_.size(); j++) {
-            angle_2(j) = interpolate(z_D_C, D_C_comp, z_2_[j]) /r_s;
+            angle_2(j) = D_C_vals_2[j] /r_s;
         }
         // calculate predicted angles for type 3 measurements
+        std::vector<double> H_vals_3 = find_corresponding(z_H, H_comp, z_3_);
         Vector<-1> angle_3(z_3_.size());
         for (int j = 0; j < z_3_.size(); j++) {
-            angle_3(j) = PHYS_C/interpolate(z_H, H_comp, z_3_[j]) /r_s;
+            angle_3(j) = PHYS_C/H_vals_3[j] /r_s;
         }
 
         // calculate all angle residuals
@@ -122,11 +128,11 @@ public:
         Vector<-1> residuals_3 = angle_3 - angle_3_;
 
         // return the gaussian log likelihood
-        return -(inv_cov_1_*residuals_1).dot(residuals_1) /2
+        return -(LT_1_.triangularView<Eigen::Upper>()*residuals_1).squaredNorm() /2
                -(inv_cov_mix12_*residuals_2).dot(residuals_1)
-               -(inv_cov_2_*residuals_2).dot(residuals_2) /2
+               -(LT_2_.triangularView<Eigen::Upper>()*residuals_2).squaredNorm() /2
                -(inv_cov_mix23_*residuals_3).dot(residuals_2)
-               -(inv_cov_3_*residuals_3).dot(residuals_3) /2
+               -(LT_3_.triangularView<Eigen::Upper>()*residuals_3).squaredNorm() /2
                -(inv_cov_mix31_*residuals_1).dot(residuals_3);
     }
 
@@ -145,6 +151,9 @@ private:
     NonSquareMatrix<-1,-1> inv_cov_mix23_;
     Matrix<-1> inv_cov_3_;
     NonSquareMatrix<-1,-1> inv_cov_mix31_;
+    Matrix<-1> LT_1_;
+    Matrix<-1> LT_2_;
+    Matrix<-1> LT_3_;
 
     // indices of the Hubble constant and the Matter fraction in the MCMC parameters
     size_t H0_idx_;

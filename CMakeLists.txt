@@ -11,6 +11,8 @@ find_package(Eigen3 REQUIRED)
 find_package(OpenMP REQUIRED)
 # find MPI
 find_package(MPI REQUIRED)
+# find BLAS
+find_package(BLAS REQUIRED)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
@@ -41,11 +43,17 @@ add_executable(cosmos_test
 target_link_libraries(cosmos_test PRIVATE cosmos)
 target_link_libraries(cosmos_test PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(cosmos_test PRIVATE MPI::MPI_CXX)
+target_link_libraries(cosmos_test PRIVATE BLAS::BLAS)
+target_link_libraries(cosmos_test PRIVATE lapacke)
+target_compile_definitions(cosmos_test PRIVATE EIGEN_USE_BLAS EIGEN_USE_LAPACKE)
 
 # MCMC executable
-add_executable(test_MCMC
+add_executable(run_MCMC
     models/run_MCMC.cxx
 )
-target_link_libraries(test_MCMC PRIVATE cosmos)
-target_link_libraries(test_MCMC PRIVATE OpenMP::OpenMP_CXX)
-target_link_libraries(test_MCMC PRIVATE MPI::MPI_CXX)
+target_link_libraries(run_MCMC PRIVATE cosmos)
+target_link_libraries(run_MCMC PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(run_MCMC PRIVATE MPI::MPI_CXX)
+target_link_libraries(run_MCMC PRIVATE BLAS::BLAS)
+target_link_libraries(run_MCMC PRIVATE lapacke)
+target_compile_definitions(run_MCMC PRIVATE EIGEN_USE_BLAS EIGEN_USE_LAPACKE)

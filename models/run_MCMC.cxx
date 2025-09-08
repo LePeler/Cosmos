@@ -21,19 +21,19 @@ double Or0 = 5e-5;
 // double OmL0 = 1.0 - Om0 - Or0;
 
 
-bool prior(const Vector<3> params) {
+bool prior(const Vector<3> &params) {
     return (50.0 < params(0)) && (params(0) < 100.0) && (0.0 < params(1)) && (params(1) < 1.0);
 }
 
-Vector<0> Model(Vector<0> state, double z, Vector<3> params) {
+Vector<0> Model(const Vector<0> &state, double z, const Vector<3> &params) {
     return Vector<0>{};
 }
 
-Vector<0> GetY0(Vector<3> params) {
+Vector<0> GetY0(const Vector<3> &params) {
     return Vector<0>{};
 }
 
-double GetH(Vector<0> state, double z, Vector<3> params) {
+double GetH(const Vector<0> &state, double z, const Vector<3> &params) {
     double H0 = params(0);
     double Om0 = params(1);
     double a = 1/(1.0+z);
@@ -52,7 +52,9 @@ int main(int argc, char* argv[]) {
 
     // setup likelihoods
     std::vector<std::shared_ptr<LikelihoodBase<3>>> likelihoods;
+    //likelihoods.push_back(std::make_shared<CC<3>>("/home/aurora/university/ISSA/MCMC_Data/CC"));
     likelihoods.push_back(std::make_shared<SN1a<3>>("/home/aurora/university/ISSA/MCMC_Data/SN1a", 2));
+    //likelihoods.push_back(std::make_shared<BAO<3>>("/home/aurora/university/ISSA/MCMC_Data/BAO", 0, 1));
 
     CombinedLikelihood<3, 0> combined_likelihood(likelihoods, prior, Model, GetY0, GetH);
 
@@ -66,7 +68,7 @@ int main(int argc, char* argv[]) {
     Vector<3> z;
     std::normal_distribution<double> distN01(0.0, 1.0);
     std::mt19937 randgen(std::random_device{}());
-    const unsigned int W = 10;
+    const unsigned int W = 50;
     std::array<Vector<3>, W> init_states;
     for (unsigned int w = 0; w < W; w++) {
         z << distN01(randgen), distN01(randgen), distN01(randgen);
@@ -83,10 +85,10 @@ int main(int argc, char* argv[]) {
     while (true) {
         it++;
         sampler.MakeIter();
-        if (!(it % 200)) {
+        if (!(it % 100) && proc == 0) {
             std::cout << "at iteration " << it << std::endl;
             std::pair<double, double> RHat_and_ESS = sampler.GetRHatAndESS();
-            if (RHat_and_ESS.first < 1.02 && RHat_and_ESS.second > 400) {
+            if (RHat_and_ESS.first < 1.03 && RHat_and_ESS.second > 20*W) {
                 break;
             }
         }
@@ -96,20 +98,24 @@ int main(int argc, char* argv[]) {
 
     std::cout << "running production ..." << std::endl;
     // instantiate progress bar
-    unsigned int K = 1000;
-    DotProgressBar progress_bar(K, "iter(s)", int(K/100), 70);
+    unsigned int K = 50000;
+    //DotProgressBar progress_bar(K, "iter(s)", int(K/100), 70);
 
     // run MCMC production
-    for (unsigned int k = 0; k < K; k++) {
+    it = 0;
+    while (true) {
+        it++;
         sampler.MakeIter();
-        if (proc == 0) {
-            progress_bar.step();
-            //std::cout << "mean = " << sampler.GetStateMean() << std::endl;
-            //std::cout << "variance = " << sampler.GetStateVariance() << std::endl;
-            //std::cout << "autocorr time = " << sampler.GetIntegAutocorrTime() << std::endl;
-            //std::cout << std::endl;
+        if (!(it % 100) && proc == 0) {
+            std::cout << "at iteration " << it << std::endl;
+            std::pair<double, double> RHat_and_ESS = sampler.GetRHatAndESS();
+            if (RHat_and_ESS.first < 1.01 && RHat_and_ESS.second > 100*W) {
+                break;
+            }
         }
     }
+    std::cout << "finished production after " << it << " iterations." << std::endl;
+
     if (proc == 0) {
         std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
     }

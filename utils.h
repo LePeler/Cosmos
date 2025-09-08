@@ -229,83 +229,113 @@ void sort(std::vector<T> &to_sort) {
 }
 
 
+// find the corresponding y vals to the values in x (x has to be sorted)
+std::vector<double> find_corresponding(const std::vector<double> &X, const std::vector<double> &Y, const std::vector<double> &x) {
+    if (X.size() != Y.size()) {
+        throw std::runtime_error("X and Y must have the same length.");
+    }
+
+    std::vector<double> result(x.size(), NAN);
+
+    size_t j = 0;
+    for (size_t k = 0; k < x.size(); k++) {
+        while (X[j] != x[k]) {
+            j++;
+            if (j >= X.size()) {
+                break;
+            }
+        }
+        result[k] = Y[j];
+    }
+
+    return result;
+}
+
+
 // interpolate linearly
 double interpolate(const std::vector<double> &X, const std::vector<double> &Y, double x) {
     if (X.size() != Y.size()) {
-        throw std::runtime_error(("X and Y must be of same size, but have " + std::to_string(X.size()) + " and " + std::to_string(Y.size()) + ".").c_str());
+        throw std::runtime_error("X and Y must have the same length.");
     }
 
     // if x is in X return the corresponding element from Y
-    for (size_t j = 0; j < X.size(); j++) {
-        if (X[j] == x) {
-            return Y[j];
-        }
+    std::vector<double>::const_iterator it_x = std::find(X.begin(), X.end(), x);
+    size_t j_x = std::distance(X.begin(), it_x);
+    if (j_x != X.size()) {
+        return Y[j_x];
     }
 
     // else do the usual interpolation
-    for (size_t j = 0; j < X.size()-1; j++) {
-        if (X[j] <= x && x < X[j+1]) {
-            return Y[j] + (Y[j+1]-Y[j]) /(X[j+1]-X[j]) *(x-X[j]);
-        }
+    std::vector<double>::const_iterator it_up = std::upper_bound(X.begin(), X.end(), x);
+    size_t j_up = std::distance(X.begin(), it_up); // index of first element > x
+
+    if (j_up == 0 || j_up == X.size()) {
+        throw std::runtime_error("x is out of range.");
     }
 
-    // x is not between min(X) and max(X) so cannot interpolate
-    throw std::invalid_argument("x is outside of the interpolatable range.");
+    return Y[j_up-1] + (Y[j_up]-Y[j_up-1]) /(X[j_up]-X[j_up-1]) *(x-X[j_up-1]);
 }
 
 
 // interpolate semi-linearly in 2 dimensions
 double interpolate2d(const std::vector<double> &X, const std::vector<double> &Y, const std::vector<std::vector<double>> &grid, double x, double y) {
     if (X.size() != grid.size()) {
-        throw std::runtime_error(("X and grid must be of same size, but have " + std::to_string(X.size()) + " and " + std::to_string(grid.size()) + ".").c_str());
+        throw std::runtime_error("X and grid must have the same size.");
     }
 
     // do the usual interpolation (skip checking whether x,y are in X,Y as it is unlikely)
-    for (size_t j = 0; j < X.size()-1; j++) {
-        if (X[j] <= x && x < X[j+1]) {
-            for (size_t k = 0; k < Y.size()-1; k++) {
-                if (Y[k] <= y && y < Y[k+1]) {
-                    double dx = X[j+1] - X[j];
-                    double dy = Y[k+1] - Y[k];
-                    double z00 = grid[j].at(k);
-                    return z00 + (grid[j+1].at(k)-z00) /dx *(x-X[j]) + (grid[j].at(k+1)-z00) /dy *(y-Y[k])
-                               + (grid[j+1].at(k+1)-grid[j+1].at(k)-grid[j].at(k+1)+z00) /dx /dy *(x-X[j]) *(y-Y[k]);
-                }
-            }
-        }
+    std::vector<double>::const_iterator it_j_up = std::upper_bound(X.begin(), X.end(), x);
+    size_t j_up = std::distance(X.begin(), it_j_up); // index of first element > x
+    std::vector<double>::const_iterator it_k_up = std::upper_bound(Y.begin(), Y.end(), y);
+    size_t k_up = std::distance(Y.begin(), it_k_up); // index of first element > y
+
+    if (j_up == 0 || j_up == X.size()) {
+        throw std::runtime_error("x is out of range.");
+    }
+    if (k_up == 0 || k_up == Y.size()) {
+        throw std::runtime_error("y is out of range.");
     }
 
-    // (x,y) is not in the range spanned by X and Y so cannot interpolate
-    throw std::invalid_argument("(x,y) is outside of the interpolatable range.");
+    double dx = X[j_up] - X[j_up-1];
+    double dy = Y[k_up] - Y[k_up-1];
+    double z00 = grid[j_up-1].at(k_up-1);
+    return z00 + (grid[j_up].at(k_up-1)-z00) /dx *(x-X[j_up-1]) + (grid[j_up-1].at(k_up)-z00) /dy *(y-Y[k_up-1])
+                + (grid[j_up].at(k_up)-grid[j_up].at(k_up-1)-grid[j_up-1].at(k_up)+z00) /dx /dy *(x-X[j_up-1]) *(y-Y[k_up-1]);
 }
 
 
 // numerical integration of the multiplicative inverse
 double integrate_inverse(const std::vector<double> &X, const std::vector<double> &Y, double x0, double x1) {
     if (X.size() != Y.size()) {
-        throw std::runtime_error(("X and Y must be of same length, but have " + std::to_string(X.size()) + " and " + std::to_string(Y.size()) + ".").c_str());
+        throw std::runtime_error("X and Y must have the same length.");
+    }
+
+    std::vector<double>::const_iterator it0 = std::lower_bound(X.begin(), X.end(), x0);
+    std::vector<double>::const_iterator it1 = std::upper_bound(X.begin(), X.end(), x1);
+    size_t j0 = std::distance(X.begin(), it0); // index of first element >= x0
+    size_t j1 = std::distance(X.begin(), it1-1); // index of last element <= x1
+
+    if (j0 > j1 || j1 >= X.size()) {
+        throw std::runtime_error("The integration bounds (x0 and x1) are out of range.");
     }
 
     double result = 0.0;
-    for (size_t j = 0; j < X.size()-1; j++) {
-        if (X[j+1] <= x0) {
-            continue;
+    if (X[j0] != x0) {
+        if (j0 == 0) {
+            throw std::runtime_error("The integration bounds (x0 and x1) are out of range.");
         }
-        else if (X[j] >= x1) {
-            break;
+        double y0 = Y[j0-1] + (Y[j0]-Y[j0-1]) /(X[j0]-X[j0-1]) *(x0-X[j0-1]);
+        result += (1/y0+1/Y[j0]) /2 *(X[j0]-x0);
+    }
+    if (X[j1] != x1) {
+        if (j1 == X.size()-1) {
+            throw std::runtime_error("The integration bounds (x0 and x1) are out of range.");
         }
-
-        else if (x0 <= X[j] && X[j+1] <= x1) {
-            result += (1/Y[j]+1/Y[j+1]) /2 *(X[j+1]-X[j]);
-        }
-        else if (X[j] < x0 && x0 < X[j+1]) {
-            double y0 = Y[j] + (Y[j+1]-Y[j]) /(X[j+1]-X[j]) *(x0-X[j]);
-            result += (1/y0+1/Y[j+1]) /2 *(X[j+1]-x0);
-        }
-        else if (X[j] < x1 && x1 < X[j+1]) {
-            double y1 = Y[j] + (Y[j+1]-Y[j]) /(X[j+1]-X[j]) *(x1-X[j]);
-            result += (1/Y[j]+1/y1) /2 *(x1-X[j]);
-        }
+        double y1 = Y[j1] + (Y[j1+1]-Y[j1]) /(X[j1+1]-X[j1]) *(x1-X[j1]);
+        result += (1/Y[j1]+1/y1) /2 *(x1-X[j1]);
+    }
+    for (size_t j = j0; j < j1; j++) {
+        result += (1/Y[j]+1/Y[j+1]) /2 *(X[j+1]-X[j]);
     }
 
     return result;

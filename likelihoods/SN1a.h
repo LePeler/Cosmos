@@ -51,6 +51,9 @@ public:
         inv_cov_mix_ = convert_nonsquarematrix(inv_cov_mix_tmp);
         std::vector<std::vector<double>> inv_cov_calib_tmp = read_txt(data_dir / fs::path("SN1a_inv_cov_calib.txt"), ',');
         inv_cov_calib_ = convert_matrix(inv_cov_calib_tmp);
+
+        LT_signal_ = inv_cov_signal_.llt().matrixU();
+        LT_calib_ = inv_cov_calib_.llt().matrixU();
     }
 
     ~SN1a() = default;
@@ -66,23 +69,21 @@ public:
         double M = params(M_idx_);
 
         // interpolate the comoving distance and calculate the predicted magnitudes
+        std::vector<double> D_C_vals = find_corresponding(z_D_C, D_C_comp, z_);
         Vector<-1> m(z_.size());
         for (int j = 0; j < z_.size(); j++) {
-            m(j) = 5 * log10(interpolate(z_D_C, D_C_comp, z_[j])) + 25.0 + M;
+            m(j) = 5 * log10(D_C_vals[j]) + 25.0 + M;
         }
         // calculate the magnitude residuals
         Vector<-1> signal_residuals = m - m_;
 
         // calculate the absolue magnitude calibration residuals
-        Vector<-1> calib_residuals(M_calib_.size());
-        for (int j = 0; j < M_calib_.size(); j++) {
-            calib_residuals(j) = M - M_calib_(j);
-        }
+        Vector<-1> calib_residuals = M - M_calib_.array();
 
         // return the gaussian log likelihood
-        return -(inv_cov_signal_*signal_residuals).dot(signal_residuals) /2
+        return -(LT_signal_.triangularView<Eigen::Upper>()*signal_residuals).squaredNorm() /2
                -(inv_cov_mix_*signal_residuals).dot(calib_residuals)
-               -(inv_cov_calib_*calib_residuals).dot(calib_residuals) /2;
+               -(LT_calib_.triangularView<Eigen::Upper>()*calib_residuals).squaredNorm() /2;
     }
 
 
@@ -93,6 +94,8 @@ private:
     Matrix<-1> inv_cov_signal_;
     NonSquareMatrix<-1,-1> inv_cov_mix_;
     Matrix<-1> inv_cov_calib_;
+    Matrix<-1> LT_signal_;
+    Matrix<-1> LT_calib_;
 
     // index of the SN1a absolute magnitude in the MCMC parameters
     size_t M_idx_;

@@ -77,18 +77,29 @@ public:
             return -INFINITY;
         }
 
-        // evaluate model at the given parameters
-        std::function<Vector<D>(Vector<D>, double)> func = [this, params](Vector<D> y, double z) {
-            return model_(y, z, params);
-        };
-        // RK4 numerical solver of D dimensional differential equations
-        Vector<D> y0 = get_y0_(params);
-        RK4<D> solver(func, y0, 0.0);
-        // get the H values from the solver
+        // compute H(z)
         std::vector<double> H_comp;
-        for (size_t j = 0; j < z_H_.size(); j++) {
-            solver.MakeStep(dz_H_[j]);
-            H_comp.push_back(get_H_z_(solver.GetCurrentValue(), z_H_[j], params));
+        // if there is nothing to solve, don't solve
+        if (D == 0) {
+            // get the H values
+            for (size_t j = 0; j < z_H_.size(); j++) {
+                H_comp.push_back(get_H_z_(Vector<0>{}, z_H_[j], params));
+            }
+        }
+        // else use the RK4 solver
+        else {
+            // evaluate model at the given parameters
+            std::function<Vector<D>(const Vector<D> &, double)> func = [this, params](const Vector<D> &y, double z) {
+                return model_(y, z, params);
+            };
+            // RK4 numerical solver of D dimensional differential equations
+            Vector<D> y0 = get_y0_(params);
+            RK4<D> solver(func, y0, 0.0);
+            // get the H values from the solver
+            for (size_t j = 0; j < z_H_.size(); j++) {
+                solver.MakeStep(dz_H_[j]);
+                H_comp.push_back(get_H_z_(solver.GetCurrentValue(), z_H_[j], params));
+            }
         }
 
         // integrate c/H to give D_C

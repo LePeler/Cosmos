@@ -36,6 +36,8 @@ public:
 
         std::vector<std::vector<double>> inv_cov_tmp = read_txt(data_dir / fs::path("CC_inv_cov.txt"), ',');
         inv_cov_ = convert_matrix(inv_cov_tmp);
+
+        LT_ = inv_cov_.llt().matrixU();
     }
 
     ~CC() = default;
@@ -48,15 +50,16 @@ public:
                             const std::vector<double> &D_C_comp) const override {
 
         // interpolate the predicted Hubble parameters
+        std::vector<double> H_vals = find_corresponding(z_H, H_comp, z_);
         Vector<-1> H_pred(z_.size());
         for (int j = 0; j < z_.size(); j++) {
-            H_pred(j) = interpolate(z_H, H_comp, z_[j]);
+            H_pred(j) = H_vals[j];
         }
         // calculate the Hubble parameter residuals
         Vector<-1> residuals = H_pred - H_;
 
         // return the gaussian log likelihood
-        return -(inv_cov_*residuals).dot(residuals) /2;
+        return -(LT_.triangularView<Eigen::Upper>()*residuals).squaredNorm() /2;
     }
 
 
@@ -64,6 +67,7 @@ private:
     // CC data
     Vector<-1> H_;
     Matrix<-1> inv_cov_;
+    Matrix<-1> LT_;
 };
 
 
