@@ -4,7 +4,7 @@
 #include <mpi.h>
 
 #include <utils.h>
-#include <ProgressBar.h>
+#include <Monitor.h>
 #include <solvers/RK4.h>
 #include <likelihoods/SN1a.h>
 #include <likelihoods/CC.h>
@@ -79,42 +79,42 @@ int main(int argc, char* argv[]) {
     std::function<double(const Vector<3> &)> log_likelihood = [&](const Vector<3> &params) {return combined_likelihood.log_likelihood(params);};
     MCMC2<3, W> sampler(proc, num_procs, log_likelihood, init_states, 1.0, 2.0);
 
-    // run burn-in
     std::cout << "running burn-in ..." << std::endl;
-    size_t it = 0;
+
+    // instantiate burn-in monitor
+    Monitor burn_in_monitor({"RHat", "ESS"},
+        [&]() {std::pair<double, double> RHat_and_ESS = sampler.GetRHatAndESS();
+            return std::vector<double>{RHat_and_ESS.first, RHat_and_ESS.second};},
+        {[](double RHat) {return (RHat < 1.03);}, [](double ESS) {return (ESS > 20*W);}}, 100);
+
+    // run burn-in
     while (true) {
-        it++;
         sampler.MakeIter();
-        if (!(it % 100) && proc == 0) {
-            std::cout << "at iteration " << it << std::endl;
-            std::pair<double, double> RHat_and_ESS = sampler.GetRHatAndESS();
-            if (RHat_and_ESS.first < 1.03 && RHat_and_ESS.second > 20*W) {
+        if (proc == 0) {
+            if (burn_in_monitor()) {
                 break;
             }
         }
     }
-    std::cout << "finished burn-in after " << it << " iterations." << std::endl;
     sampler.Reset();
 
     std::cout << "running production ..." << std::endl;
-    // instantiate progress bar
-    unsigned int K = 50000;
-    //DotProgressBar progress_bar(K, "iter(s)", int(K/100), 70);
+
+    // instantiate production_monitor
+    Monitor production_monitor({"RHat", "ESS"},
+        [&]() {std::pair<double, double> RHat_and_ESS = sampler.GetRHatAndESS();
+            return std::vector<double>{RHat_and_ESS.first, RHat_and_ESS.second};},
+        {[](double RHat) {return (RHat < 1.01);}, [](double ESS) {return (ESS > 100*W);}}, 100);
 
     // run MCMC production
-    it = 0;
     while (true) {
-        it++;
         sampler.MakeIter();
-        if (!(it % 100) && proc == 0) {
-            std::cout << "at iteration " << it << std::endl;
-            std::pair<double, double> RHat_and_ESS = sampler.GetRHatAndESS();
-            if (RHat_and_ESS.first < 1.01 && RHat_and_ESS.second > 100*W) {
+        if (proc == 0) {
+            if (production_monitor()) {
                 break;
             }
         }
     }
-    std::cout << "finished production after " << it << " iterations." << std::endl;
 
     if (proc == 0) {
         std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
