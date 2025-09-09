@@ -6,6 +6,7 @@
 #include <cmath>
 
 #include <Eigen/Dense>
+#include <cblas.h>
 
 
 #ifndef UTILS_H_INCLUDED
@@ -24,6 +25,89 @@ using NonSquareMatrix = Eigen::Matrix<double, N, K>;
 
 // speed of light in km/s
 const double PHYS_C = 299792.458;
+
+
+
+// multithreaded vector scalar multiplication using BLAS
+template<int N>
+double blas_dot(const Vector<N> &v1, const Vector<N> &v2) {
+    if (v1.rows() != v2.rows()) {
+        throw std::runtime_error("The vectors have different dimensions.");
+    }
+
+    // call BLAS ddot
+    return cblas_ddot(
+        v1.rows(),      // length of vectors
+        v1.data(), 1,   // x pointer and stride (1 = contiguous)
+        v2.data(), 1    // y pointer and stride
+    );
+}
+
+
+
+// multithreaded vector squared norm using BLAS
+template<int N>
+double blas_squared_norm(const Vector<N> &v) {
+    return blas_dot(v, v);
+}
+
+
+// multithreaded vector-matrix multiplication using BLAS
+template<int N, int K>
+Vector<N> blas_gemv(const NonSquareMatrix<N, K> &M, const Vector<K> &v) {
+    if (M.cols() != v.rows()) {
+        throw std::runtime_error("The matrix and vector dimensions don't match.");
+    }
+
+    Vector<N> result(M.rows());
+
+    // call BLAS dgemv
+    cblas_dgemv(
+        CblasColMajor,      // Eigen uses column-major storage by default
+        CblasNoTrans,       // M * v, not M^T * v
+        M.rows(),           // number of rows of M
+        M.cols(),           // number of cols of M
+        1.0,                // alpha
+        M.data(),           // pointer to M
+        M.outerStride(),    // leading dimension (stride between columns)
+        v.data(),           // pointer to v
+        1,                  // increment for v (contiguous)
+        0.0,                // beta (result = alpha*M*v + beta*result)
+        result.data(),      // pointer to result
+        1                   // increment for result
+    );
+
+    return result;
+}
+
+
+// multithreaded vector-upper-triangular-matrix multiplication using BLAS
+template<int N>
+Vector<N> blas_trmv_up(const Matrix<N> &L, const Vector<N> &v) {
+    if (L.rows() != L.cols()) {
+        throw std::runtime_error("The matrix is not square.");
+    }
+    if (L.cols() != v.rows()) {
+        throw std::runtime_error("The matrix and vector dimensions don't match.");
+    }
+
+    Vector<N> result = v;
+
+    // call BLAS dtrmv
+    cblas_dtrmv(
+        CblasColMajor,      // Eigen uses column-major storage by default
+        CblasUpper,         // upper-triangular
+        CblasNoTrans,       // M * v, not M^T * v
+        CblasNonUnit,       // diagonal has real values (not all 1)
+        L.rows(),           // matrix dimension
+        L.data(),           // pointer to L
+        L.rows(),           // leading dimension of L
+        result.data(),      // pointer to result (which is also the input vector v)
+        1                   // increment for result
+    );
+
+    return result;
+}
 
 
 // get the mean of the vectors inside the vector
