@@ -114,6 +114,7 @@ public:
     std::pair<double, double> GetRHatAndESS(size_t L) const {
         // split each chain in two halves
         std::array<std::vector<Vector<N>>, 2*W> split_sample;
+        # pragma omp parallel for
         for (unsigned int w = 0; w < W; w++) {
             split_sample[2*w] = std::vector<Vector<N>>(sample_[w].end() - L, sample_[w].end() - L + L/2);
             split_sample[2*w+1] = std::vector<Vector<N>>(sample_[w].end() - L/2, sample_[w].end());
@@ -124,6 +125,7 @@ public:
 
         // fold each split-chain about its median
         std::array<std::vector<Vector<N>>, 2*W> folded_split_sample;
+        # pragma omp parallel for
         for (unsigned int w = 0; w < 2*W; w++) {
             folded_split_sample[w] = Fold(split_sample[w]);
         }
@@ -240,10 +242,14 @@ protected:
         size_t S = L*2*W;
         // flatten the chains for each component
         std::array<std::vector<double>, N> flattened_chains;
+        for (int n = 0; n < N; n++) {
+            flattened_chains[n].resize(2*W*L);
+        }
+        # pragma omp parallel for
         for (unsigned int w = 0; w < 2*W; w++) {
             for (size_t j = 0; j < chains[w].size(); j++) {
                 for (int n = 0; n < N; n++) {
-                    flattened_chains[n].push_back(chains[w][j](n));
+                    flattened_chains[n][chains[w].size()*w+j] = chains[w][j](n);
                 }
             }
         }
@@ -254,6 +260,7 @@ protected:
         // calculate the rank of each value and transform into a standard normal using the probit function
         size_t rank;
         std::array<std::vector<Vector<N>>, 2*W> rank_normalized_chains;
+        # pragma omp parallel for
         for (unsigned int w = 0; w < 2*W; w++) {
             rank_normalized_chains[w].resize(chains[w].size());
             for (size_t j = 0; j < chains[w].size(); j++) {
@@ -299,6 +306,7 @@ protected:
         // compute the chain means and variances and the global mean
         std::array<Vector<N>, 2*W> chain_means;
         std::array<double, 2*W> chain_vars;
+        # pragma omp parallel for
         for (unsigned int w = 0; w < 2*W; w++) {
             chain_means[w] = get_mean(chains[w]);
             chain_vars[w] = get_variance(chains[w], chain_means[w]);
@@ -307,6 +315,7 @@ protected:
         // compute the between and within chain variances
         double between = 0.0;
         double within = 0.0;
+        # pragma omp parallel for
         for (unsigned int w = 0; w < 2*W; w++) {
             between += (chain_means[w] - global_mean).dot(chain_means[w] - global_mean);
             within += chain_vars[w];
@@ -328,6 +337,7 @@ protected:
         for (size_t k = 0; k < (L-1)/2; k++) {
             numerator = 0.0;
             // calculate lag 2k and 2k+1 autocorrelations
+            # pragma omp parallel for
             for (unsigned int w = 0; w < 2*W; w++) {
                 numerator -= get_lag_k_covariance(chains[w], 2*k, chain_means[w])
                             + get_lag_k_covariance(chains[w], 2*k+1, chain_means[w]);

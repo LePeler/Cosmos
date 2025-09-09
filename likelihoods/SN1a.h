@@ -81,8 +81,8 @@ public:
         Vector<-1> calib_residuals = M - M_calib_.array();
 
         // return the gaussian log likelihood
-        return -blas_squared_norm(blas_trmv_up(LT_signal_, signal_residuals)) /2
-               -blas_gemv(inv_cov_mix_, signal_residuals).dot(calib_residuals)
+        return -(LT_signal_.triangularView<Eigen::Upper>()*signal_residuals).squaredNorm() /2
+               -(inv_cov_mix_*signal_residuals).dot(calib_residuals)
                -(LT_calib_.triangularView<Eigen::Upper>()*calib_residuals).squaredNorm() /2;
     }
 
