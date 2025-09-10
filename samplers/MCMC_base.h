@@ -56,54 +56,6 @@ public:
     // destructor
     ~MCMC_base() = default;
 
-    // synchronize a std::array<Vector<N>, W> (e.g. the walker states) over all processes
-    void Synchronize(std::array<Vector<N>, W> &vec_arr) {
-
-        MPI_Allgatherv(
-            vec_arr[start_].data(),       // pointer to local data to send
-            (stop_ - start_) *N,          // number of elements to send
-            MPI_DOUBLE,                   // MPI Datatype (sent)
-            vec_arr[0].data(),            // pointer to the global container to send to
-            components_per_proc_.data(),  // number of elements sent by each process
-            component_offsets_.data(),    // offset between the data of each process
-            MPI_DOUBLE,                   // MPI Datatype (received)
-            MPI_COMM_WORLD                // comm world object
-        );
-    }
-
-    // synchronize a std::array<double, W> (e.g. the logprobs) over all processes
-    void Synchronize(std::array<double, W> &arr) {
-
-        MPI_Allgatherv(
-            arr.data() + start_,       // pointer to local data to send
-            stop_ - start_,            // number of elements to send
-            MPI_DOUBLE,                // MPI Datatype (sent)
-            arr.data(),                // pointer to the global container to send to
-            walkers_per_proc_.data(),  // number of elements sent by each process
-            walker_offsets_.data(),    // offset between the data of each process
-            MPI_DOUBLE,                // MPI Datatype (received)
-            MPI_COMM_WORLD             // comm world object
-        );
-    }
-
-    // sum all counters on the main process
-    unsigned int SumCountersOnMain(const unsigned int &counter) {
-        unsigned int global_sum = 0;
-
-        MPI_Reduce(
-            &counter,       // pointer to the local counter
-            &global_sum,    // pointer to the global variable to aggregate into
-            1,              // number of elements of each counter
-            MPI_UNSIGNED,   // MPI Datatype
-            MPI_SUM,        // how to aggregate the individual counters
-            0,              // on which process to aggregate
-            MPI_COMM_WORLD  // comm world object
-        );
-
-        return global_sum;
-    }
-
-
     // get the current walker states
     std::array<Vector<N>, W> GetStates() const {
         return states_;
@@ -268,6 +220,53 @@ protected:
 
     // tuning constant for acceptance probabilities
     double alpha_;
+
+    // synchronize a std::array<Vector<N>, W> (e.g. the walker states) over all processes
+    void Synchronize(std::array<Vector<N>, W> &vec_arr) {
+
+        MPI_Allgatherv(
+            vec_arr[start_].data(),       // pointer to local data to send
+            (stop_ - start_) *N,          // number of elements to send
+            MPI_DOUBLE,                   // MPI Datatype (sent)
+            vec_arr[0].data(),            // pointer to the global container to send to
+            components_per_proc_.data(),  // number of elements sent by each process
+            component_offsets_.data(),    // offset between the data of each process
+            MPI_DOUBLE,                   // MPI Datatype (received)
+            MPI_COMM_WORLD                // comm world object
+        );
+    }
+
+    // synchronize a std::array<double, W> (e.g. the logprobs) over all processes
+    void Synchronize(std::array<double, W> &arr) {
+
+        MPI_Allgatherv(
+            arr.data() + start_,       // pointer to local data to send
+            stop_ - start_,            // number of elements to send
+            MPI_DOUBLE,                // MPI Datatype (sent)
+            arr.data(),                // pointer to the global container to send to
+            walkers_per_proc_.data(),  // number of elements sent by each process
+            walker_offsets_.data(),    // offset between the data of each process
+            MPI_DOUBLE,                // MPI Datatype (received)
+            MPI_COMM_WORLD             // comm world object
+        );
+    }
+
+    // sum all counters on the main process
+    unsigned int SumCountersOnMain(const unsigned int &counter) {
+        unsigned int global_sum = 0;
+
+        MPI_Reduce(
+            &counter,       // pointer to the local counter
+            &global_sum,    // pointer to the global variable to aggregate into
+            1,              // number of elements of each counter
+            MPI_UNSIGNED,   // MPI Datatype
+            MPI_SUM,        // how to aggregate the individual counters
+            0,              // on which process to aggregate
+            MPI_COMM_WORLD  // comm world object
+        );
+
+        return global_sum;
+    }
 
     // rank-normalize the chains
     std::array<std::vector<Vector<N>>, 2*W> RankNormalize(const std::array<std::vector<Vector<N>>, 2*W> &chains) const {
