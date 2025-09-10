@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
                   0.0, 0.0, 1.0;
     Vector<3> z;
     std::normal_distribution<double> distN01(0.0, 1.0);
-    std::mt19937 randgen(std::random_device{}());
+    std::mt19937 randgen(314159);
     const unsigned int W = 50;
     std::array<Vector<3>, W> init_states;
     for (unsigned int w = 0; w < W; w++) {

@@ -18,8 +18,7 @@ public:
     MCMC(int proc, int num_procs, std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha, double beta = 2)
         :
         MCMC_base<N, W>(proc, num_procs, lnP, init_states, alpha),
-        beta_(beta),
-        dist0W2_(0, W-2)
+        beta_(beta)
     {}
 
     // destructor
@@ -30,20 +29,21 @@ private:
     // range constant for the state pdf
     double beta_;
 
-    // uniform size_t distribution from 0 to W-2
-    std::uniform_int_distribution<size_t> dist0W2_;
-
     // sample a new state for walker w and also return the associated pdf value
     std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) override {
 
+        // each thread gets its own uniform 0-to-(W-2) distribution and uniform 0-to-1 distribution
+        thread_local static std::uniform_int_distribution<size_t> dist0W2(0, W-2);
+        thread_local static std::uniform_real_distribution<double> dist01(0.0, 1.0);
+
         // sample non-w walker for stretch move
-        unsigned int idx = dist0W2_(randgen);
+        unsigned int idx = dist0W2(randgen);
         if (idx >= w) {
             idx++;
         }
 
         // sample stretch factor
-        double rand01 = this->dist01_(randgen);
+        double rand01 = dist01(randgen);
         double stretch = ((beta_-1)*rand01 + 1) * ((beta_-1)*rand01 + 1) /beta_;
 
         return std::make_pair(

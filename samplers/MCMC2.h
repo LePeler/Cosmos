@@ -21,8 +21,7 @@ public:
         beta_(beta),
         Mu_(Vector<N>::Zero()),
         Var_(Matrix<N>::Identity()),
-        L_(Matrix<N>::Identity()),
-        distN01_(0.0, 1.0)
+        L_(Matrix<N>::Identity())
     {}
 
     // destructor
@@ -40,9 +39,6 @@ private:
     // Cholesky decomposition of the scaled variance matrix
     Matrix<N> L_;
 
-    // normal distribution with mu=0 and sigma=1
-    std::normal_distribution<double> distN01_;
-
     // update the Mu_, Var_ and L_ members
     void UpdateInternals() override {
         Mu_ = this->GetStateMean();
@@ -53,10 +49,13 @@ private:
     // sample a new state for walker w and also return the associated pdf value
     std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) override {
 
+        // each thread gets its own standard normal distribution
+        thread_local static std::normal_distribution<double> distN01(0.0, 1.0);
+
         // sample a vector of standard normal distributed values
         Vector<N> z;
         for (unsigned int n = 0; n < N; n++) {
-            z(n) = distN01_(randgen);
+            z(n) = distN01(randgen);
         }
 
         return std::make_pair(

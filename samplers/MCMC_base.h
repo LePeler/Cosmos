@@ -30,8 +30,7 @@ public:
         states_(init_states),
         num_iters_(0),
         num_accepted_(0),
-        alpha_(alpha),
-        dist01_(0.0, 1.0)
+        alpha_(alpha)
     {
         // walker range that belongs to this process
         walkers_per_proc_ = W /num_procs;
@@ -42,7 +41,9 @@ public:
         for (unsigned int w = start_; w < stop_; w++) {
             logprobs_[w] = lnP_(states_[w]);
         }
-        // broadcast logprobs
+
+        // broadcast states and logprobs
+        Broadcast(states_);
         Broadcast(logprobs_);
     }
 
@@ -114,7 +115,7 @@ public:
     std::pair<double, double> GetRHatAndESS(size_t L) const {
         // split each chain in two halves
         std::array<std::vector<Vector<N>>, 2*W> split_sample;
-        # pragma omp parallel for
+        #pragma omp parallel for
         for (unsigned int w = 0; w < W; w++) {
             split_sample[2*w] = std::vector<Vector<N>>(sample_[w].end() - L, sample_[w].end() - L + L/2);
             split_sample[2*w+1] = std::vector<Vector<N>>(sample_[w].end() - L/2, sample_[w].end());
@@ -125,7 +126,7 @@ public:
 
         // fold each split-chain about its median
         std::array<std::vector<Vector<N>>, 2*W> folded_split_sample;
-        # pragma omp parallel for
+        #pragma omp parallel for
         for (unsigned int w = 0; w < 2*W; w++) {
             folded_split_sample[w] = Fold(split_sample[w]);
         }
@@ -233,9 +234,6 @@ protected:
     // tuning constant for acceptance probabilities
     double alpha_;
 
-    // uniform double distribution from 0 to 1
-    std::uniform_real_distribution<double> dist01_;
-
     // rank-normalize the chains
     std::array<std::vector<Vector<N>>, 2*W> RankNormalize(const std::array<std::vector<Vector<N>>, 2*W> &chains) const {
         size_t L = chains[0].size();
@@ -245,7 +243,7 @@ protected:
         for (int n = 0; n < N; n++) {
             flattened_chains[n].resize(2*W*L);
         }
-        # pragma omp parallel for
+        #pragma omp parallel for
         for (unsigned int w = 0; w < 2*W; w++) {
             for (size_t j = 0; j < chains[w].size(); j++) {
                 for (int n = 0; n < N; n++) {
@@ -258,14 +256,13 @@ protected:
             sort(flattened_chains[n]);
         }
         // calculate the rank of each value and transform into a standard normal using the probit function
-        size_t rank;
         std::array<std::vector<Vector<N>>, 2*W> rank_normalized_chains;
-        # pragma omp parallel for
+        #pragma omp parallel for
         for (unsigned int w = 0; w < 2*W; w++) {
             rank_normalized_chains[w].resize(chains[w].size());
             for (size_t j = 0; j < chains[w].size(); j++) {
                 for (int n = 0; n < N; n++) {
-                    rank = get_index(chains[w][j](n), flattened_chains[n]) + 1;
+                    size_t rank = get_index(chains[w][j](n), flattened_chains[n]) + 1;
                     rank_normalized_chains[w][j](n) = probit((rank - 0.375) /(S + 0.25));
                 }
             }
@@ -306,7 +303,7 @@ protected:
         // compute the chain means and variances and the global mean
         std::array<Vector<N>, 2*W> chain_means;
         std::array<double, 2*W> chain_vars;
-        # pragma omp parallel for
+        #pragma omp parallel for
         for (unsigned int w = 0; w < 2*W; w++) {
             chain_means[w] = get_mean(chains[w]);
             chain_vars[w] = get_variance(chains[w], chain_means[w]);
@@ -315,9 +312,11 @@ protected:
         // compute the between and within chain variances
         double between = 0.0;
         double within = 0.0;
-        # pragma omp parallel for
+        #pragma omp parallel for
         for (unsigned int w = 0; w < 2*W; w++) {
+            #pragma omp atomic
             between += (chain_means[w] - global_mean).dot(chain_means[w] - global_mean);
+            #pragma omp atomic
             within += chain_vars[w];
         }
         between /= (2*W-1);
@@ -337,8 +336,9 @@ protected:
         for (size_t k = 0; k < (L-1)/2; k++) {
             numerator = 0.0;
             // calculate lag 2k and 2k+1 autocorrelations
-            # pragma omp parallel for
+            #pragma omp parallel for
             for (unsigned int w = 0; w < 2*W; w++) {
+                #pragma omp atomic
                 numerator -= get_lag_k_covariance(chains[w], 2*k, chain_means[w])
                             + get_lag_k_covariance(chains[w], 2*k+1, chain_means[w]);
             }
@@ -380,8 +380,9 @@ protected:
         #pragma omp parallel for
         for (unsigned int w = start_; w < stop_; w++) {
 
-            // each thread gets its own RNG
-            thread_local static std::mt19937 randgen(std::random_device{}());
+            // each thread gets its own RNG and uniform 0-to-1 distribution
+            thread_local static std::mt19937 randgen(42 + omp_get_thread_num());
+            thread_local static std::uniform_real_distribution<double> dist01(0.0, 1.0);
 
             // sample new state
             std::pair<Vector<N>, double> new_state_tmp = SampleNewState(w, randgen);
@@ -396,7 +397,7 @@ protected:
             //std::cout << acceptance_prob << " , " << new_state_prob << " , " << new_logprob - logprobs_[w] << std::endl;
 
             // accept or reject
-            double rand01 = dist01_(randgen);
+            double rand01 = dist01(randgen);
             if (rand01 < acceptance_prob) {
                 states_[w] = new_state;
                 logprobs_[w] = new_logprob;
