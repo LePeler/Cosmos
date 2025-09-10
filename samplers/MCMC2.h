@@ -47,7 +47,7 @@ private:
     }
 
     // sample a new state for walker w and also return the associated pdf value
-    std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) override {
+    std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) const override {
 
         // each thread gets its own standard normal distribution
         thread_local static std::normal_distribution<double> distN01(0.0, 1.0);

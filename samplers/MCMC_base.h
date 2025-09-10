@@ -33,44 +33,76 @@ public:
         alpha_(alpha)
     {
         // walker range that belongs to this process
-        walkers_per_proc_ = W /num_procs;
-        start_ = walkers_per_proc_ *proc;
-        stop_ = walkers_per_proc_ *(proc+1);
+        double wpp = double(W) /num_procs;
+        start_ = wpp *proc;
+        stop_ = wpp *(proc+1);
+        for (int pid = 0; pid < num_procs; pid++) {
+            walker_offsets_.push_back(wpp *pid);
+            walkers_per_proc_.push_back(wpp *(pid+1) - walker_offsets_.back());
+            components_per_proc_.push_back(walkers_per_proc_.back() *N);
+            component_offsets_.push_back(walker_offsets_.back() *N);
+        }
 
         // calculate initial logprobs
         for (unsigned int w = start_; w < stop_; w++) {
             logprobs_[w] = lnP_(states_[w]);
         }
 
-        // broadcast states and logprobs
-        Broadcast(states_);
-        Broadcast(logprobs_);
+        // synchronize states and logprobs
+        Synchronize(states_);
+        Synchronize(logprobs_);
     }
 
     // destructor
     ~MCMC_base() = default;
 
-    // broadcast a std::array<Vector<N>, W> (e.g. the walker states) over all processes
-    void Broadcast(std::array<Vector<N>, W> &vec_arr) {
-        unsigned int start;
-        unsigned int stop;
-        for (unsigned int proc = 0; proc < num_procs_; proc++) {
-            start = walkers_per_proc_ *proc;
-            stop = walkers_per_proc_ *(proc+1);
-            MPI_Bcast(vec_arr[start].data(), (stop-start)*N, MPI_DOUBLE, proc, MPI_COMM_WORLD);
-        }
+    // synchronize a std::array<Vector<N>, W> (e.g. the walker states) over all processes
+    void Synchronize(std::array<Vector<N>, W> &vec_arr) {
+
+        MPI_Allgatherv(
+            vec_arr[start_].data(),       // pointer to local data to send
+            (stop_ - start_) *N,          // number of elements to send
+            MPI_DOUBLE,                   // MPI Datatype (sent)
+            vec_arr[0].data(),            // pointer to the global container to send to
+            components_per_proc_.data(),  // number of elements sent by each process
+            component_offsets_.data(),    // offset between the data of each process
+            MPI_DOUBLE,                   // MPI Datatype (received)
+            MPI_COMM_WORLD                // comm world object
+        );
     }
 
-    // broadcast a std::array<double, W> (e.g. the logprobs) over all processes
-    void Broadcast(std::array<double, W> &arr) {
-        unsigned int start;
-        unsigned int stop;
-        for (unsigned int proc = 0; proc < num_procs_; proc++) {
-            start = walkers_per_proc_ *proc;
-            stop = walkers_per_proc_ *(proc+1);
-            MPI_Bcast(&arr[start], stop-start, MPI_DOUBLE, proc, MPI_COMM_WORLD);
-        }
+    // synchronize a std::array<double, W> (e.g. the logprobs) over all processes
+    void Synchronize(std::array<double, W> &arr) {
+
+        MPI_Allgatherv(
+            arr.data() + start_,       // pointer to local data to send
+            stop_ - start_,            // number of elements to send
+            MPI_DOUBLE,                // MPI Datatype (sent)
+            arr.data(),                // pointer to the global container to send to
+            walkers_per_proc_.data(),  // number of elements sent by each process
+            walker_offsets_.data(),    // offset between the data of each process
+            MPI_DOUBLE,                // MPI Datatype (received)
+            MPI_COMM_WORLD             // comm world object
+        );
     }
+
+    // sum all counters on the main process
+    unsigned int SumCountersOnMain(const unsigned int &counter) {
+        unsigned int global_sum = 0;
+
+        MPI_Reduce(
+            &counter,       // pointer to the local counter
+            &global_sum,    // pointer to the global variable to aggregate into
+            1,              // number of elements of each counter
+            MPI_UNSIGNED,   // MPI Datatype
+            MPI_SUM,        // how to aggregate the individual counters
+            0,              // on which process to aggregate
+            MPI_COMM_WORLD  // comm world object
+        );
+
+        return global_sum;
+    }
+
 
     // get the current walker states
     std::array<Vector<N>, W> GetStates() const {
@@ -211,9 +243,12 @@ protected:
     // MPI: process number and number of total processes
     int proc_;
     int num_procs_;
-    double walkers_per_proc_;
     unsigned int start_;
     unsigned int stop_;
+    std::vector<int> walkers_per_proc_;
+    std::vector<int> walker_offsets_;
+    std::vector<int> components_per_proc_;
+    std::vector<int> component_offsets_;
 
     // log-likelihood function
     std::function<double(const Vector<N> &)> lnP_;
@@ -368,7 +403,7 @@ protected:
     virtual void UpdateInternals() {};
 
     // sample a new state for walker w and also return the associated pdf value
-    virtual std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) = 0;
+    virtual std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) const = 0;
 
     // compute an iteration of the respective MCMC algorithm
     void ComputeIter() {
@@ -381,7 +416,7 @@ protected:
         for (unsigned int w = start_; w < stop_; w++) {
 
             // each thread gets its own RNG and uniform 0-to-1 distribution
-            thread_local static std::mt19937 randgen(42 + omp_get_thread_num());
+            thread_local static std::mt19937 randgen(42 + omp_get_thread_num() + 321*proc_);
             thread_local static std::uniform_real_distribution<double> dist01(0.0, 1.0);
 
             // sample new state
@@ -407,21 +442,15 @@ protected:
             }
         }
 
-        // broadcast states and logprobs
-        Broadcast(states_);
-        Broadcast(logprobs_);
+        // synchronize states and logprobs
+        Synchronize(states_);
+        Synchronize(logprobs_);
 
         // update counters
+        unsigned int global_accepted = SumCountersOnMain(accepted);
         if (proc_ == 0) {
             num_iters_++;
-            num_accepted_ += accepted;
-            for (int proc = 1; proc < num_procs_; proc++) {
-                MPI_Recv(&accepted, 1, MPI_UNSIGNED, proc, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                num_accepted_ += accepted;
-            }
-        }
-        else {
-            MPI_Send(&accepted, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD);
+            num_accepted_ += global_accepted;
         }
     }
 };

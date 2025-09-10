@@ -30,7 +30,7 @@ private:
     double beta_;
 
     // sample a new state for walker w and also return the associated pdf value
-    std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) override {
+    std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) const override {
 
         // each thread gets its own uniform 0-to-(W-2) distribution and uniform 0-to-1 distribution
         thread_local static std::uniform_int_distribution<size_t> dist0W2(0, W-2);
