@@ -28,6 +28,27 @@ const double PHYS_C = 299792.458;
 
 
 
+// Chebyshev root-finding method
+double chebyshev_root(const std::function<double(double)> &func, const std::function<double(double)> &deriv, double x0, double thr = 1e-6) {
+    double x = x0;
+    double y;
+    double f_prime;
+
+    while(true) {
+        f_prime = deriv(x);
+        y = x - func(x)/f_prime;
+        x = y - func(y)/f_prime;
+
+        // consider converged, if relative change is small enough
+        if (std::abs(1-x/y) < thr) {
+            break;
+        }
+    }
+
+    return x;
+}
+
+
 // multithreaded vector scalar multiplication using BLAS
 template<int N>
 double blas_dot(const Vector<N> &v1, const Vector<N> &v2) {
