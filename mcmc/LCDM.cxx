@@ -13,16 +13,14 @@
 #include <samplers/MCMC2.h>
 
 
-// tau = 3.08e19 s
-
-// double H0 = 69.0; // 1/tau
-// double Om0 = 0.3;
 double Or0 = 5e-5;
-// double OmL0 = 1.0 - Om0 - Or0;
+
+// params {H0, Om0, M}
 
 
 bool prior(const Vector<3> &params) {
-    return (50.0 < params(0)) && (params(0) < 100.0) && (0.0 < params(1)) && (params(1) < 1.0);
+    return (50.0 < params(0)) && (params(0) < 100.0)
+        && (0.0 < params(1)) && (params(1) < 1.0);
 }
 
 Vector<0> Model(const Vector<0> &state, double z, const Vector<3> &params) {

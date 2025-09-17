@@ -22,38 +22,34 @@ target_include_directories(cosmos INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(cosmos INTERFACE ${EIGEN3_INCLUDE_DIR})
 set_target_properties(cosmos PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-
-# executable to simulate LCDM
-add_executable(LCDM
-    models/LCDM.cxx
-)
-target_link_libraries(LCDM PRIVATE cosmos)
-
-# executable to simulate quintessence
-add_executable(quintessence
-    models/quintessence.cxx
-)
-target_link_libraries(quintessence PRIVATE cosmos)
+# function to add an executable,
+# automatically link all needed libraries
+# and set the appropriate compile definitions
+function(add_cosmos_executable name)
+    add_executable(${name} ${ARGN})
+    target_link_libraries(${name} PRIVATE
+        cosmos
+        OpenMP::OpenMP_CXX
+        MPI::MPI_CXX
+        BLAS::BLAS
+        lapacke
+    )
+    target_compile_definitions(${name} PRIVATE
+        EIGEN_USE_BLAS
+        EIGEN_USE_LAPACKE
+    )
+endfunction()
 
 
 # test executable
-add_executable(cosmos_test
+add_cosmos_executable(cosmos_test
     test.cxx
 )
-target_link_libraries(cosmos_test PRIVATE cosmos)
-target_link_libraries(cosmos_test PRIVATE OpenMP::OpenMP_CXX)
-target_link_libraries(cosmos_test PRIVATE MPI::MPI_CXX)
-target_link_libraries(cosmos_test PRIVATE BLAS::BLAS)
-target_link_libraries(cosmos_test PRIVATE lapacke)
-target_compile_definitions(cosmos_test PRIVATE EIGEN_USE_BLAS EIGEN_USE_LAPACKE)
-
-# MCMC executable
-add_executable(run_MCMC
-    models/run_MCMC.cxx
+# LCDM MCMC executable
+add_cosmos_executable(run_LCDM
+    mcmc/LCDM.cxx
 )
-target_link_libraries(run_MCMC PRIVATE cosmos)
-target_link_libraries(run_MCMC PRIVATE OpenMP::OpenMP_CXX)
-target_link_libraries(run_MCMC PRIVATE MPI::MPI_CXX)
-target_link_libraries(run_MCMC PRIVATE BLAS::BLAS)
-target_link_libraries(run_MCMC PRIVATE lapacke)
-target_compile_definitions(run_MCMC PRIVATE EIGEN_USE_BLAS EIGEN_USE_LAPACKE)
+# f1 MCMC executable
+add_cosmos_executable(run_f1
+    mcmc/f1.cxx
+)
