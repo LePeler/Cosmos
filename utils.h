@@ -160,7 +160,7 @@ template<int N>
 double get_lag_k_covariance(const std::vector<Vector<N>> &vecs, size_t k, const Vector<N> &mean) {
     double result = 0.0;
     for (size_t j = 0; j < vecs.size()-k; j++) {
-        result += (vecs[j]-mean).dot(vecs[j+k]-mean);
+        result += (vecs[j]-mean).dot(vecs[j+k]-mean) /N;
     }
     result /= (vecs.size()-1);
 

@@ -9,15 +9,15 @@
 #define MCMC_H_INCLUDED
 
 
-// affine invariant MCMC sampler
+// affine invariant MCMC sampler (Goodman and Weare)
 template<int N, unsigned int W>
 class MCMC : public MCMC_base<N, W> {
 
 public:
     // constructor
-    MCMC(int proc, int num_procs, std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha, double beta = 2)
+    MCMC(int proc, int num_procs, std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double beta = 2)
         :
-        MCMC_base<N, W>(proc, num_procs, lnP, init_states, alpha),
+        MCMC_base<N, W>(proc, num_procs, lnP, init_states),
         beta_(beta)
     {}
 
@@ -29,7 +29,7 @@ private:
     // range constant for the state pdf
     double beta_;
 
-    // sample a new state for walker w and also return the associated pdf value
+    // sample a new state for walker w and also return the associated state prob ratio (old / new)
     std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) const override {
 
         // each thread gets its own uniform 0-to-(W-2) distribution and uniform 0-to-1 distribution
@@ -48,7 +48,7 @@ private:
 
         return std::make_pair(
             this->states_[w] + (this->states_[idx] - this->states_[w]) * stretch,
-            sqrt(beta_/stretch)/2/(beta_-1) /(W-1)
+            1.0
         );
     }
 };

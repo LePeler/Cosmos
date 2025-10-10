@@ -53,3 +53,11 @@ add_cosmos_executable(run_LCDM
 add_cosmos_executable(run_f1
     mcmc/f1.cxx
 )
+# f2 MCMC executable
+add_cosmos_executable(run_f2
+    mcmc/f2.cxx
+)
+# SFT MCMC executable
+add_cosmos_executable(run_SFT
+    mcmc/SFT.cxx
+)

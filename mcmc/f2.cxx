@@ -13,13 +13,13 @@
 #include <samplers/MCMC2.h>
 
 
-// params {H0, Om0, b1, M}
+// params {H0, Om0, b2inv, M}
 
 
 bool prior(const Vector<4> &params) {
     return (50.0 < params(0)) && (params(0) < 100.0)
         && (0.0 < params(1)) && (params(1) < 1.0)
-        && (params(2) < 1.0);
+        && (0.0 < params(2)) && (params(2) < 1.0);
 }
 
 Vector<0> Model(const Vector<0> &state, double z, const Vector<4> &params) {
@@ -40,17 +40,19 @@ double LCDM_E(double z, const Vector<4> &params) {
 double func(double E, double z, const Vector<4> &params) {
     double H0 = params(0);
     double Om0 = params(1);
-    double b1 = params(2);
+    double b2inv = params(2);
     double Or0 = 4.1534e-1 /H0/H0;
-    return E*E - Om0*(1+z)*(1+z)*(1+z) - Or0*(1+z)*(1+z)*(1+z)*(1+z) - (1-Om0-Or0)*pow(E, 2*b1);
+    double a2 = (1-Om0-Or0)/((1/b2inv + 1)*exp(-1/b2inv) - 1);
+    return E*E - Om0*(1+z)*(1+z)*(1+z) - Or0*(1+z)*(1+z)*(1+z)*(1+z) - a2 *((1 + E/b2inv)*exp(-E/b2inv) - 1);
 }
 
 double deriv(double E, double z, const Vector<4> &params) {
     double H0 = params(0);
     double Om0 = params(1);
-    double b1 = params(2);
+    double b2inv = params(2);
     double Or0 = 4.1534e-1 /H0/H0;
-    return 2*E - (1-Om0-Or0)*2*b1*pow(E, 2*b1-1.0);
+    double a2 = (1-Om0-Or0)/((1/b2inv + 1)*exp(-1/b2inv) - 1);
+    return 2*E + a2 /b2inv/b2inv *E *exp(-E/b2inv);
 }
 
 double GetH(const Vector<0> &state, double z, const Vector<4> &params) {
@@ -80,11 +82,11 @@ int main(int argc, char* argv[]) {
 
     // define initial walker states
     Vector<4> mu_init;
-    mu_init << 69.0, 0.3, 0.0, -19.0;
+    mu_init << 73.0, 0.3, 0.0, -19.0;
     Matrix<4> sigma_init;
     sigma_init << 3.0, 0.0, 0.0, 0.0,
                   0.0, 0.1, 0.0, 0.0,
-                  0.0, 0.0, 0.5, 0.0,
+                  0.0, 0.0, 0.1, 0.0,
                   0.0, 0.0, 0.0, 1.0;
     Vector<4> z;
     std::normal_distribution<double> distN01(0.0, 1.0);
@@ -157,7 +159,7 @@ int main(int argc, char* argv[]) {
         std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
     }
 
-    fs::path out_path("/home/aurora/mcmc_results/f1_CC_SN1a.txt");
+    fs::path out_path("/home/aurora/mcmc_results/f2_CC_SN1a.txt");
     sampler.SaveSample(out_path, true);
 
     MPI_Finalize();

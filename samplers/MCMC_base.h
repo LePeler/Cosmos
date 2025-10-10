@@ -22,15 +22,14 @@ class MCMC_base {
 
 public:
     // constructor
-    MCMC_base(int proc, int num_procs, std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states, double alpha)
+    MCMC_base(int proc, int num_procs, std::function<double(const Vector<N> &)> lnP, std::array<Vector<N>, W> init_states)
         :
         proc_(proc),
         num_procs_(num_procs),
         lnP_(lnP),
         states_(init_states),
         num_iters_(0),
-        num_accepted_(0),
-        alpha_(alpha)
+        num_accepted_(0)
     {
         // walker range that belongs to this process
         double wpp = double(W) /num_procs;
@@ -349,7 +348,7 @@ protected:
         #pragma omp parallel for
         for (unsigned int w = 0; w < 2*W; w++) {
             #pragma omp atomic
-            between += (chain_means[w] - global_mean).dot(chain_means[w] - global_mean);
+            between += (chain_means[w] - global_mean).dot(chain_means[w] - global_mean) /N;
             #pragma omp atomic
             within += chain_vars[w];
         }
@@ -401,12 +400,13 @@ protected:
     // can be overwritten by children if needed
     virtual void UpdateInternals() {};
 
-    // sample a new state for walker w and also return the associated pdf value
+    // sample a new state for walker w and also return the state prob ratio (old / new)
     virtual std::pair<Vector<N>, double> SampleNewState(unsigned int w, std::mt19937 &randgen) const = 0;
 
     // compute an iteration of the respective MCMC algorithm
     void ComputeIter() {
         unsigned int accepted = 0;
+        unsigned int overflowed = 0;
 
         // update sampler members
         UpdateInternals();
@@ -421,14 +421,14 @@ protected:
             // sample new state
             std::pair<Vector<N>, double> new_state_tmp = SampleNewState(w, randgen);
             Vector<N> new_state = new_state_tmp.first;
-            double new_state_prob = new_state_tmp.second;
+            double state_prob_ratio = new_state_tmp.second;
 
             // calculate logprob for new state
             double new_logprob = lnP_(new_state);
 
             // calculate acceptance probability
-            double acceptance_prob = alpha_/new_state_prob * exp((new_logprob - logprobs_[w])/2);
-            //std::cout << acceptance_prob << " , " << new_state_prob << " , " << new_logprob - logprobs_[w] << std::endl;
+            double acceptance_prob = state_prob_ratio * exp(new_logprob - logprobs_[w]);
+            //std::cout << acceptance_prob << " , " << state_prob_ratio << " , " << new_logprob - logprobs_[w] << std::endl;
 
             // accept or reject
             double rand01 = dist01(randgen);

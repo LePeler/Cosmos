@@ -13,8 +13,6 @@
 #include <samplers/MCMC2.h>
 
 
-double Or0 = 5e-5;
-
 // params {H0, Om0, M}
 
 
@@ -34,8 +32,8 @@ Vector<0> GetY0(const Vector<3> &params) {
 double GetH(const Vector<0> &state, double z, const Vector<3> &params) {
     double H0 = params(0);
     double Om0 = params(1);
-    double a = 1/(1.0+z);
-    return H0 * sqrt(Om0/a/a/a + Or0/a/a/a/a + (1-Om0-Or0));
+    double Or0 = 4.1534e-1 /H0/H0;
+    return H0 * sqrt(Om0*(1+z)*(1+z)*(1+z) + Or0*(1+z)*(1+z)*(1+z)*(1+z) + (1-Om0-Or0));
 }
 
 
@@ -50,7 +48,7 @@ int main(int argc, char* argv[]) {
 
     // setup likelihoods
     std::vector<std::shared_ptr<LikelihoodBase<3>>> likelihoods;
-    //likelihoods.push_back(std::make_shared<CC<3>>("/home/aurora/university/ISSA/MCMC_Data/CC"));
+    likelihoods.push_back(std::make_shared<CC<3>>("/home/aurora/university/ISSA/MCMC_Data/CC"));
     likelihoods.push_back(std::make_shared<SN1a<3>>("/home/aurora/university/ISSA/MCMC_Data/SN1a", 2));
     //likelihoods.push_back(std::make_shared<BAO<3>>("/home/aurora/university/ISSA/MCMC_Data/BAO", 0, 1));
 
@@ -58,7 +56,7 @@ int main(int argc, char* argv[]) {
 
     // define initial walker states
     Vector<3> mu_init;
-    mu_init << 69.0, 0.3, -19.0;
+    mu_init << 73.0, 0.3, -19.0;
     Matrix<3> sigma_init;
     sigma_init << 3.0, 0.0, 0.0,
                   0.0, 0.1, 0.0,
@@ -75,7 +73,7 @@ int main(int argc, char* argv[]) {
 
     // instantiate MCMC sampler
     std::function<double(const Vector<3> &)> log_likelihood = [&](const Vector<3> &params) {return combined_likelihood.log_likelihood(params);};
-    MCMC2<3, W> sampler(proc, num_procs, log_likelihood, init_states, 1.0, 2.0);
+    MCMC2<3, W> sampler(proc, num_procs, log_likelihood, init_states, 1.5);
 
     bool burn_in_done = false;
     // instantiate burn-in monitor
@@ -134,7 +132,7 @@ int main(int argc, char* argv[]) {
         std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
     }
 
-    fs::path out_path("/home/aurora/sim_results/MCMC_LCDM_SN1a_2.txt");
+    fs::path out_path("/home/aurora/mcmc_results/LCDM_CC_SN1a.txt");
     sampler.SaveSample(out_path, true);
 
     MPI_Finalize();

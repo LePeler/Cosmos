@@ -41,24 +41,6 @@ public:
         }
         sort(z_H_tmp);
 
-        // insert filler values where distance too large
-        for (size_t j = 1; j < z_H_tmp.size(); j++) {
-            double dz_init = z_H_tmp[j] - z_H_tmp[j-1];
-
-            unsigned int N_fills = static_cast<unsigned int>(dz_init/dz_max);
-            double dz = dz_init/(N_fills+1);
-            for (unsigned int k = 1; k <= N_fills; k++) {
-                z_H_.push_back(z_H_tmp[j-1] + k*dz);
-            }
-            z_H_.push_back(z_H_tmp[j]);
-        }
-
-        // compute z interval widths
-        dz_H_.push_back(z_H_[0]);
-        for (size_t j = 1; j < z_H_.size(); j++) {
-            dz_H_.push_back(z_H_[j] - z_H_[j-1]);
-        }
-
         // combine all redshifts at which D_C is needed and sort
         for (const std::shared_ptr<LikelihoodBase<N>> &likelihood : likelihoods_) {
             if (likelihood->NeedsD_C()) {
@@ -66,6 +48,29 @@ public:
             }
         }
         sort(z_D_C_);
+
+        if (z_D_C_.size() == 0 && D == 0) {
+            z_H_ = z_H_tmp;
+        }
+        else {
+            // insert filler values where distance too large
+            for (size_t j = 1; j < z_H_tmp.size(); j++) {
+                double dz_init = z_H_tmp[j] - z_H_tmp[j-1];
+
+                unsigned int N_fills = static_cast<unsigned int>(dz_init/dz_max);
+                double dz = dz_init/(N_fills+1);
+                for (unsigned int k = 1; k <= N_fills; k++) {
+                    z_H_.push_back(z_H_tmp[j-1] + k*dz);
+                }
+                z_H_.push_back(z_H_tmp[j]);
+            }
+        }
+
+        // compute z interval widths
+        dz_H_.push_back(z_H_[0]);
+        for (size_t j = 1; j < z_H_.size(); j++) {
+            dz_H_.push_back(z_H_[j] - z_H_[j-1]);
+        }
     }
 
     ~CombinedLikelihood() = default;
@@ -83,7 +88,7 @@ public:
         if (D == 0) {
             // get the H values
             for (size_t j = 0; j < z_H_.size(); j++) {
-                H_comp.push_back(get_H_z_(Vector<0>{}, z_H_[j], params));
+                H_comp.push_back(get_H_z_(Vector<D>{}, z_H_[j], params));
             }
         }
         // else use the RK4 solver
