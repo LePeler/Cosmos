@@ -13,13 +13,13 @@
 #include <samplers/MCMC2.h>
 
 
-// params {H0, Om0, b2inv, M}
+// params {H0, Om0, b2_inv, M}
 
 
 bool prior(const Vector<4> &params) {
     return (50.0 < params(0)) && (params(0) < 100.0)
         && (0.0 < params(1)) && (params(1) < 1.0)
-        && (0.0 < params(2)) && (params(2) < 1.0);
+        && (0.0 < params(2));
 }
 
 Vector<0> Model(const Vector<0> &state, double z, const Vector<4> &params) {
@@ -34,32 +34,57 @@ double LCDM_E(double z, const Vector<4> &params) {
     double H0 = params(0);
     double Om0 = params(1);
     double Or0 = 4.1534e-1 /H0/H0;
-    return sqrt(Om0*(1+z)*(1+z)*(1+z) + Or0*(1+z)*(1+z)*(1+z)*(1+z) + (1-Om0-Or0));
+    return sqrt(Om0*pow(1+z, 3) + Or0*pow(1+z, 4) + (1-Om0-Or0));
 }
 
 double func(double E, double z, const Vector<4> &params) {
     double H0 = params(0);
     double Om0 = params(1);
-    double b2inv = params(2);
+    double b2_inv = params(2);
+    double b2 = 1/b2_inv;
     double Or0 = 4.1534e-1 /H0/H0;
-    double a2 = (1-Om0-Or0)/((1/b2inv + 1)*exp(-1/b2inv) - 1);
-    return E*E - Om0*(1+z)*(1+z)*(1+z) - Or0*(1+z)*(1+z)*(1+z)*(1+z) - a2 *((1 + E/b2inv)*exp(-E/b2inv) - 1);
+    double beta = (1 - Om0 - Or0) / ((b2 + 1)*exp(-b2) - 1);
+    return E*E - Om0*pow(1+z, 3) - Or0*pow(1+z, 4) - beta*((1+b2*E)*exp(-b2*E) - 1);
 }
 
 double deriv(double E, double z, const Vector<4> &params) {
     double H0 = params(0);
     double Om0 = params(1);
-    double b2inv = params(2);
+    double b2_inv = params(2);
+    double b2 = 1/b2_inv;
     double Or0 = 4.1534e-1 /H0/H0;
-    double a2 = (1-Om0-Or0)/((1/b2inv + 1)*exp(-1/b2inv) - 1);
-    return 2*E + a2 /b2inv/b2inv *E *exp(-E/b2inv);
+    double beta = (1 - Om0 - Or0) / ((b2 + 1)*exp(-b2) - 1);
+    return 2*E + beta*b2*b2*E*exp(-b2*E);
 }
 
 double GetH(const Vector<0> &state, double z, const Vector<4> &params) {
     double H0 = params(0);
-    return H0 * chebyshev_root([z, params](double E) {return func(E, z, params);},
-                               [z, params](double E) {return deriv(E, z, params);},
-                               LCDM_E(z, params), 1e-6, 10);
+    double E_lcdm = LCDM_E(z, params);
+
+    double root = chebyshev_root([z, params](double E) {return func(E, z, params);},
+                            [z, params](double E) {return deriv(E, z, params);},
+                            E_lcdm, 1e-6, 10);
+
+    for (short i = 1; i < 15; i++) {
+        if (!std::isnan(root)) {
+            break;
+        }
+        root = chebyshev_root([z, params](double E) {return func(E, z, params);},
+                            [z, params](double E) {return deriv(E, z, params);},
+                            E_lcdm *pow(2, i), 1e-6, 10);
+        if (!std::isnan(root)) {
+            break;
+        }
+        root = chebyshev_root([z, params](double E) {return func(E, z, params);},
+                            [z, params](double E) {return deriv(E, z, params);},
+                            E_lcdm *pow(2, -i), 1e-6, 10);
+    }
+    if (std::isnan(root)) {
+        std::cerr << "warning: could not find root" << std::endl;
+        return NAN;
+    }
+
+    return H0 * root;
 }
 
 
@@ -76,7 +101,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::shared_ptr<LikelihoodBase<4>>> likelihoods;
     likelihoods.push_back(std::make_shared<CC<4>>("/home/aurora/university/ISSA/MCMC_Data/CC"));
     likelihoods.push_back(std::make_shared<SN1a<4>>("/home/aurora/university/ISSA/MCMC_Data/SN1a", 3));
-    //likelihoods.push_back(std::make_shared<BAO<4>>("/home/aurora/university/ISSA/MCMC_Data/BAO", 0, 1));
+    likelihoods.push_back(std::make_shared<BAO<4>>("/home/aurora/university/ISSA/MCMC_Data/BAO", 0, 1));
 
     CombinedLikelihood<4, 0> combined_likelihood(likelihoods, prior, Model, GetY0, GetH);
 
@@ -86,7 +111,7 @@ int main(int argc, char* argv[]) {
     Matrix<4> sigma_init;
     sigma_init << 3.0, 0.0, 0.0, 0.0,
                   0.0, 0.1, 0.0, 0.0,
-                  0.0, 0.0, 0.1, 0.0,
+                  0.0, 0.0, 0.5, 0.0,
                   0.0, 0.0, 0.0, 1.0;
     Vector<4> z;
     std::normal_distribution<double> distN01(0.0, 1.0);
@@ -159,7 +184,7 @@ int main(int argc, char* argv[]) {
         std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
     }
 
-    fs::path out_path("/home/aurora/mcmc_results/f2_CC_SN1a.txt");
+    fs::path out_path("/home/aurora/mcmc_results/f2_CC_SN1a_BAO.txt");
     sampler.SaveSample(out_path, true);
 
     MPI_Finalize();

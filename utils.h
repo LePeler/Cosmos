@@ -45,6 +45,8 @@ double chebyshev_root(const std::function<double(double)> &func, const std::func
         }
     }
 
+    //std::cerr << "warning: chebyshev method has not converged!" << std::endl;
+
     return NAN;
 }
 

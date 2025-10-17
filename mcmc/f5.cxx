@@ -13,13 +13,13 @@
 #include <samplers/MCMC2.h>
 
 
-// params {H0, Om0, b3_inv, M}
+// params {H0, Om0, b5, M}
 
 
 bool prior(const Vector<4> &params) {
     return (50.0 < params(0)) && (params(0) < 100.0)
         && (0.0 < params(1)) && (params(1) < 1.0)
-        && (0.0 < params(2));
+        && (params(2) < 0.0);
 }
 
 Vector<0> Model(const Vector<0> &state, double z, const Vector<4> &params) {
@@ -37,24 +37,33 @@ double LCDM_E(double z, const Vector<4> &params) {
     return sqrt(Om0*pow(1+z, 3) + Or0*pow(1+z, 4) + (1-Om0-Or0));
 }
 
+double sech(double x) {
+    double tanh_x = tanh(x);
+    return sqrt(1 - tanh_x*tanh_x);
+}
+
 double func(double E, double z, const Vector<4> &params) {
     double H0 = params(0);
     double Om0 = params(1);
-    double b3_inv = params(2);
-    double b3 = 1/b3_inv;
+    double b5 = params(2);
     double Or0 = 4.1534e-1 /H0/H0;
-    double beta = (1 - Om0 - Or0) / ((1 + 2*b3)*exp(-b3) - 1);
-    return E*E - Om0*pow(1+z, 3) - Or0*pow(1+z, 4) - beta*((1+2*b3*E*E)*exp(-b3*E*E) - 1);
+    double beta = (1 - Om0 - Or0) / ((2*b5-1)*tanh(1) -2*sech(1)*sech(1));
+    double tanh_E2 = tanh(1/E/E);
+    double sech_E2 = sech(1/E/E);
+
+    return E*E - Om0*pow(1+z, 3) - Or0*pow(1+z, 4) - beta*pow(E, 2*(b5-1)) *((2*b5-1)*E*E*tanh_E2 -2*sech_E2*sech_E2);
 }
 
 double deriv(double E, double z, const Vector<4> &params) {
     double H0 = params(0);
     double Om0 = params(1);
-    double b3_inv = params(2);
-    double b3 = 1/b3_inv;
+    double b5 = params(2);
     double Or0 = 4.1534e-1 /H0/H0;
-    double beta = (1 - Om0 - Or0) / ((1 + 2*b3)*exp(-b3) - 1);
-    return 2*E - beta*2*b3*E*(1 - 2*b3*E*E)*exp(-b3*E*E);
+    double beta = (1 - Om0 - Or0) / ((2*b5-1)*tanh(1) -2*sech(1)*sech(1));
+    double tanh_E2 = tanh(1/E/E);
+    double sech_E2 = sech(1/E/E);
+
+    return 2*E - beta*pow(E, 2*b5-3) *(2*b5*b5*E*E*tanh_E2 +2*(-4*b5+3)*sech_E2*sech_E2 -8/E/E*sech_E2*sech_E2*tanh_E2);
 }
 
 double GetH(const Vector<0> &state, double z, const Vector<4> &params) {
@@ -184,7 +193,7 @@ int main(int argc, char* argv[]) {
         std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
     }
 
-    fs::path out_path("/home/aurora/mcmc_results/f3_CC_SN1a.txt");
+    fs::path out_path("/home/aurora/mcmc_results/f5_CC_SN1a.txt");
     sampler.SaveSample(out_path, true);
 
     MPI_Finalize();
