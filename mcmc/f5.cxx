@@ -19,7 +19,7 @@
 bool prior(const Vector<4> &params) {
     return (50.0 < params(0)) && (params(0) < 100.0)
         && (0.0 < params(1)) && (params(1) < 1.0)
-        && (params(2) < 0.0);
+        && (params(2) < 1.5);
 }
 
 Vector<0> Model(const Vector<0> &state, double z, const Vector<4> &params) {
@@ -96,6 +96,25 @@ double GetH(const Vector<0> &state, double z, const Vector<4> &params) {
     return H0 * root;
 }
 
+double GetRdrag(const Vector<4> &params) {
+    double z_drag = 1059.94;
+    double a_drag = 1.0/(1.0 + z_drag);
+    double rho_b_0 = 0.02237;
+    double rho_y_0 = 2.4697e-5;
+
+    std::function<double(double a)> dr_da = [&](double a) {
+        double z = 1.0/a - 1.0;
+        double H_z = GetH(Vector<0>{}, z, params);
+
+        double R_s = (3.0/4.0)*(rho_b_0/rho_y_0) *a;
+        double c_s = PHYS_C /sqrt(3*(1 + R_s));
+
+        return c_s /(a*a*H_z);
+    };
+
+    return gauss_legendre_16(dr_da, 1e-10, a_drag);
+}
+
 
 int main(int argc, char* argv[]) {
     // MPI setup
@@ -110,7 +129,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::shared_ptr<LikelihoodBase<4>>> likelihoods;
     likelihoods.push_back(std::make_shared<CC<4>>("/home/aurora/university/ISSA/MCMC_Data/CC"));
     likelihoods.push_back(std::make_shared<SN1a<4>>("/home/aurora/university/ISSA/MCMC_Data/SN1a", 3));
-    //likelihoods.push_back(std::make_shared<BAO<4>>("/home/aurora/university/ISSA/MCMC_Data/BAO", 0, 1));
+    likelihoods.push_back(std::make_shared<BAO<4>>("/home/aurora/university/ISSA/MCMC_Data/BAO", GetRdrag));
 
     CombinedLikelihood<4, 0> combined_likelihood(likelihoods, prior, Model, GetY0, GetH);
 
@@ -193,7 +212,7 @@ int main(int argc, char* argv[]) {
         std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
     }
 
-    fs::path out_path("/home/aurora/mcmc_results/f5_CC_SN1a.txt");
+    fs::path out_path("/home/aurora/mcmc_results/f5_CC_SN1a_BAO.txt");
     sampler.SaveSample(out_path, true);
 
     MPI_Finalize();

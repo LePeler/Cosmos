@@ -22,21 +22,11 @@ class BAO : public LikelihoodBase<N> {
     using LikelihoodBase<N>::z_;
 
 public:
-    BAO(fs::path data_dir, size_t H0_idx, size_t Om_idx)
+    BAO(fs::path data_dir, std::function<double(const Vector<N> &)> get_R_drag)
     :
     LikelihoodBase<N>(true),
-    H0_idx_(H0_idx),
-    Om_idx_(Om_idx)
+    get_R_drag_(get_R_drag)
     {
-        // check that H0_idx is in range of N
-        if (H0_idx >= N) {
-            throw std::invalid_argument("H0_idx (" + std::to_string(H0_idx_) + ") must be less than N (" + std::to_string(N) + ").");
-        }
-        // check that Om_idx is in range of N
-        if (Om_idx >= N) {
-            throw std::invalid_argument("Om_idx (" + std::to_string(Om_idx_) + ") must be less than N (" + std::to_string(N) + ").");
-        }
-
         // read in BAO data
         std::vector<double> angle_1_tmp;
         for (const std::vector<double> &datapoint : read_txt(data_dir / fs::path("BAO_z_angle_1.txt"), ',')) {
@@ -79,15 +69,6 @@ public:
         LT_1_ = inv_cov_1_.llt().matrixU();
         LT_2_ = inv_cov_2_.llt().matrixU();
         LT_3_ = inv_cov_3_.llt().matrixU();
-
-        // read in R_drag values for interpolation
-        for (const std::vector<double> &datapoint : read_txt(data_dir / fs::path("BAO_R_drag_H0.txt"), ',')) {
-            R_drag_H0_.push_back(datapoint.at(0));
-        }
-        for (const std::vector<double> &datapoint : read_txt(data_dir / fs::path("BAO_R_drag_Om.txt"), ',')) {
-            R_drag_Om_.push_back(datapoint.at(0));
-        }
-        R_drag_grid_ = read_txt(data_dir / fs::path("BAO_R_drag_grid.txt"), ',');
     }
 
     ~BAO() = default;
@@ -100,7 +81,7 @@ public:
                             const std::vector<double> &D_C_comp) const override {
 
         // calculate radius at the end of the drag epoch
-        double r_s = interpolate2d(R_drag_H0_, R_drag_Om_, R_drag_grid_, params(H0_idx_), params(Om_idx_));
+        double r_s = get_R_drag_(params);
 
         // calculate predicted angles for type 1 measurements
         std::vector<double> H_vals_1 = find_corresponding(z_H, H_comp, z_1_);
@@ -155,14 +136,8 @@ private:
     Matrix<-1> LT_2_;
     Matrix<-1> LT_3_;
 
-    // indices of the Hubble constant and the Matter fraction in the MCMC parameters
-    size_t H0_idx_;
-    size_t Om_idx_;
-
-    // R_drag values for interpolation
-    std::vector<double> R_drag_H0_;
-    std::vector<double> R_drag_Om_;
-    std::vector<std::vector<double>> R_drag_grid_;
+    // R_drag as a function of the parameters
+    std::function<double(const Vector<N> &)> get_R_drag_;
 };
 
 
