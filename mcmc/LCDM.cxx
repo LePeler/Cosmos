@@ -91,7 +91,10 @@ int main(int argc, char* argv[]) {
     }
 
     // instantiate MCMC sampler
-    std::function<double(const Vector<3> &)> log_likelihood = [&](const Vector<3> &params) {return combined_likelihood.log_likelihood(params);};
+    std::function<double(const Vector<3> &)> log_likelihood = [&](const Vector<3> &params)
+    {
+        return combined_likelihood.log_likelihood(params);
+    };
     MCMC2<3, W> sampler(proc, num_procs, log_likelihood, init_states, 1.5);
 
     bool burn_in_done = false;
@@ -133,7 +136,7 @@ int main(int argc, char* argv[]) {
             std::vector<std::function<bool(double)>>{[](double RHat) {return (RHat < 1.01);},
                                                      [](double ESS) {return (ESS > 100*W);}},
             100);
-        }
+    }
 
     // run MCMC production
     while (true) {
@@ -151,7 +154,7 @@ int main(int argc, char* argv[]) {
         std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
     }
 
-    fs::path out_path("/home/aurora/mcmc_results/LCDM_CC_SN1a_BAO.txt");
+    fs::path out_path("/home/aurora/mcmc_results/LCDM_CC_SN1a_BAO_new.txt");
     sampler.SaveSample(out_path, true);
 
     MPI_Finalize();
