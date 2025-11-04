@@ -15,6 +15,8 @@
 
 namespace fs = std::filesystem;
 
+fs::path SRC_DIR(PROJECT_SOURCE_DIR);
+
 template<int N>
 using Vector = Eigen::Matrix<double, N, 1>;
 template<int N>

@@ -38,8 +38,25 @@ function(add_cosmos_executable name)
     target_compile_definitions(${name} PRIVATE
         EIGEN_USE_BLAS
         EIGEN_USE_LAPACKE
+        PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
     )
 endfunction()
+
+
+# LCDM example MCMC executable
+add_cosmos_executable(LCDM_example
+    examples/LCDM.cxx
+)
+
+# Power Law model example MCMC executable
+add_cosmos_executable(PowerLaw_example
+    examples/PowerLaw.cxx
+)
+
+# quintessence example MCMC executable
+add_cosmos_executable(quintessence_example
+    examples/quintessence.cxx
+)
 
 
 # include user applications (if there are any)
