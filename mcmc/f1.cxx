@@ -25,19 +25,19 @@ bool range_prior(const Vector<4> &params) {
 double log_prior_SH0ES(const Vector<4> &params) {
     double H0_SH0ES = 73.04;
     double H0_sigma_SH0ES = 1.04;
-    return -1/2 * (params(0) - H0_SH0ES) /(H0_sigma_SH0ES*H0_sigma_SH0ES) *(params(0) - H0_SH0ES);
+    return -(params(0) - H0_SH0ES) /(H0_sigma_SH0ES*H0_sigma_SH0ES) *(params(0) - H0_SH0ES) /2;
 }
 
 double log_prior_H0liCOW(const Vector<4> &params) {
     double H0_H0liCOW = 73.3;
     double H0_sigma_H0liCOW = 1.75;
-    return -1/2 * (params(0) - H0_H0liCOW) /(H0_sigma_H0liCOW*H0_sigma_H0liCOW) *(params(0) - H0_H0liCOW);
+    return -(params(0) - H0_H0liCOW) /(H0_sigma_H0liCOW*H0_sigma_H0liCOW) *(params(0) - H0_H0liCOW) /2;
 }
 
 double log_prior_TRGB(const Vector<4> &params) {
     double H0_TRGB = 69.8;
     double H0_sigma_TRGB = 1.71;
-    return -1/2 * (params(0) - H0_TRGB) /(H0_sigma_TRGB*H0_sigma_TRGB) *(params(0) - H0_TRGB);
+    return -(params(0) - H0_TRGB) /(H0_sigma_TRGB*H0_sigma_TRGB) *(params(0) - H0_TRGB) /2;
 }
 
 Vector<0> Model(const Vector<0> &state, double z, const Vector<4> &params) {
@@ -136,7 +136,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::shared_ptr<LikelihoodBase<4>>> likelihoods;
     likelihoods.push_back(std::make_shared<CC<4>>("/home/aurora/university/ISSA/MCMC_Data/CC"));
     likelihoods.push_back(std::make_shared<SN1a<4>>("/home/aurora/university/ISSA/MCMC_Data/SN1a", 3));
-    likelihoods.push_back(std::make_shared<BAO<4>>("/home/aurora/university/ISSA/MCMC_Data/BAO", GetRdrag));
+    //likelihoods.push_back(std::make_shared<BAO<4>>("/home/aurora/university/ISSA/MCMC_Data/BAO", GetRdrag));
 
     CombinedLikelihood<4, 0> combined_likelihood(likelihoods, range_prior, Model, GetY0, GetH);
 
@@ -222,7 +222,7 @@ int main(int argc, char* argv[]) {
         std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
     }
 
-    fs::path out_path("/home/aurora/mcmc_results/f1_CC_SN1a_BAO(H0liCOW).txt");
+    fs::path out_path("/home/aurora/mcmc_results/f1_CC_SN1a(H0liCOW).txt");
     sampler.SaveSample(out_path, true);
 
     MPI_Finalize();

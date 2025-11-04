@@ -25,19 +25,19 @@ bool range_prior(const Vector<4> &params) {
 double log_prior_SH0ES(const Vector<4> &params) {
     double H0_SH0ES = 73.04;
     double H0_sigma_SH0ES = 1.04;
-    return -1/2 * (params(0) - H0_SH0ES) /(H0_sigma_SH0ES*H0_sigma_SH0ES) *(params(0) - H0_SH0ES);
+    return -(params(0) - H0_SH0ES) /(H0_sigma_SH0ES*H0_sigma_SH0ES) *(params(0) - H0_SH0ES) /2;
 }
 
 double log_prior_H0liCOW(const Vector<4> &params) {
     double H0_H0liCOW = 73.3;
     double H0_sigma_H0liCOW = 1.75;
-    return -1/2 * (params(0) - H0_H0liCOW) /(H0_sigma_H0liCOW*H0_sigma_H0liCOW) *(params(0) - H0_H0liCOW);
+    return -(params(0) - H0_H0liCOW) /(H0_sigma_H0liCOW*H0_sigma_H0liCOW) *(params(0) - H0_H0liCOW) /2;
 }
 
 double log_prior_TRGB(const Vector<4> &params) {
     double H0_TRGB = 69.8;
     double H0_sigma_TRGB = 1.71;
-    return -1/2 * (params(0) - H0_TRGB) /(H0_sigma_TRGB*H0_sigma_TRGB) *(params(0) - H0_TRGB);
+    return -(params(0) - H0_TRGB) /(H0_sigma_TRGB*H0_sigma_TRGB) *(params(0) - H0_TRGB) /2;
 }
 
 Vector<0> Model(const Vector<0> &state, double z, const Vector<4> &params) {
@@ -172,7 +172,7 @@ int main(int argc, char* argv[]) {
     // instantiate MCMC sampler
     std::function<double(const Vector<4> &)> log_likelihood = [&](const Vector<4> &params)
     {
-        return combined_likelihood.log_likelihood(params); // + log_prior_H0liCOW(params);
+        return combined_likelihood.log_likelihood(params) + log_prior_H0liCOW(params);
     };
     MCMC2<4, W> sampler(proc, num_procs, log_likelihood, init_states, 1.5);
 
@@ -233,7 +233,7 @@ int main(int argc, char* argv[]) {
         std::cout << "acceptance_rate: " << sampler.GetAcceptanceRate() << std::endl;
     }
 
-    fs::path out_path("/home/aurora/mcmc_results/f5_CC_SN1a.txt");
+    fs::path out_path("/home/aurora/mcmc_results/f5_CC_SN1a(H0liCOW).txt");
     sampler.SaveSample(out_path, true);
 
     MPI_Finalize();
