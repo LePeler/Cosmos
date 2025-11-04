@@ -8,6 +8,10 @@
 #ifndef MCMC_H_INCLUDED
 #define MCMC_H_INCLUDED
 
+/*
+WARNING: This sampler does not work, but is still in here in case someone will fix it in the future!
+*/
+
 
 // affine invariant MCMC sampler (Goodman and Weare)
 template<int N, unsigned int W>
@@ -19,7 +23,9 @@ public:
         :
         MCMC_base<N, W>(proc, num_procs, lnP, init_states),
         beta_(beta)
-    {}
+    {
+        throw std::logic_error("This sampler does not work, but is still in here in case someone will fix it in the future! \n Please use MCMC2 instead.");
+    }
 
     // destructor
     ~MCMC() = default;
