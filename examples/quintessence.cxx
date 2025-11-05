@@ -14,7 +14,7 @@
 
 
 // state {T, V}
-// params {H0, Om0, T0, l/H0, M}
+// params {H0, Om0, T0, l, M}
 
 
 bool range_prior(const Vector<5> &params) {
@@ -29,7 +29,7 @@ Vector<2> Model(const Vector<2> &state, double z, const Vector<5> &params) {
     double V = state(1);
     double H0 = params(0);
     double Om0 = params(1);
-    double l = params(3)*H0;
+    double l = sqrt(3)*H0*params(3);
     double Or0 = 4.1534e-1 /H0/H0;
 
     double H = H0*sqrt(Om0*pow(1+z, 3) + Or0*pow(1+z, 4) + T + V);

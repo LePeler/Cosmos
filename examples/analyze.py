@@ -15,9 +15,9 @@ if (model not in ["LCDM", "PowerLaw", "quintessence"]):
     raise ValueError(f"Please specify one of the following models: 'LCDM', 'PowerLaw' or 'quintessence', not {model}.")
 
 columns = {
-    "LCDM": ["H0 [km/s/Mpc]", "Om0", "M"],
-    "PowerLaw": ["H0 [km/s/Mpc]", "Om0", "b", "M"],
-    "quintessence": ["H0 [km/s/Mpc]", "Om0", "T0", "l/H0", "M"],
+    "LCDM": ["H0 [km/s/Mpc]", "Ωm0", "M"],
+    "PowerLaw": ["H0 [km/s/Mpc]", "Ωm0", "b", "M"],
+    "quintessence": ["H0 [km/s/Mpc]", "Ωm0", "ΩT0", "λ", "M"],
 }
 title = {
     "LCDM": "LCDM (CC+SN1a+BAO)",
