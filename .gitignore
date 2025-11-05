@@ -1,5 +1,7 @@
 
 # ignore user code
 /user/
-# ignore example script outputs
-/examples/*.txt
+# ignore example script outputs and plots
+/examples/*_output.txt
+/examples/*_plot.pdf
+

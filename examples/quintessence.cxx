@@ -14,36 +14,44 @@
 
 
 // state {T, V}
-// params {H0, Om0, T0, V0, l, M}
+// params {H0, Om0, T0, l/H0, M}
 
 
-bool range_prior(const Vector<6> &params) {
+bool range_prior(const Vector<5> &params) {
     return (50.0 < params(0)) && (params(0) < 100.0)
+        && (0.0 < params(1)) && (params(1) < 1.0)
         && (0.0 < params(2)) && (params(2) < 1.0)
-        && (0.0 < params(3)) && (params(3) < 1.0)
-        && (0.0 < params(4)) && (params(4) < 1.0);
+        && (0.0 < params(3));
 }
 
-Vector<2> Model(const Vector<2> &state, double z, const Vector<6> &params) {
+Vector<2> Model(const Vector<2> &state, double z, const Vector<5> &params) {
     double T = state(0);
     double V = state(1);
     double H0 = params(0);
     double Om0 = params(1);
-    double l = params(4);
+    double l = params(3)*H0;
     double Or0 = 4.1534e-1 /H0/H0;
 
     double H = H0*sqrt(Om0*pow(1+z, 3) + Or0*pow(1+z, 4) + T + V);
+    double dz_dt = -(z+1)*H;
 
-    double T_prime = -6*H*T + l*sqrt(2*T)*V;
-    double V_prime = -l*sqrt(2*T)*V;
-    return Vector<2>{T_prime, V_prime};
+    double T_dot = -6*H*T + l*sqrt(2*T)*V;
+    double V_dot = -l*sqrt(2*T)*V;
+    return Vector<2>{T_dot/dz_dt, V_dot/dz_dt};
 }
 
-Vector<2> GetY0(const Vector<6> &params) {
-    return Vector<2>{params(2), params(3)};
+Vector<2> GetY0(const Vector<5> &params) {
+    double H0 = params(0);
+    double Om0 = params(1);
+    double T0 = params(2);
+    double Or0 = 4.1534e-1 /H0/H0;
+
+    double V0 = 1 - Om0 - Or0 - T0;
+
+    return Vector<2>{T0, V0};
 }
 
-double GetH(const Vector<2> &state, double z, const Vector<6> &params) {
+double GetH(const Vector<2> &state, double z, const Vector<5> &params) {
     double T = state(0);
     double V = state(1);
     double H0 = params(0);
@@ -64,38 +72,37 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
     // setup likelihoods
-    std::vector<std::shared_ptr<LikelihoodBase<6>>> likelihoods;
-    likelihoods.push_back(std::make_shared<CC<6>>(SRC_DIR / "data/CC"));
-    likelihoods.push_back(std::make_shared<SN1a<6>>(SRC_DIR / "data/SN1a", 5));
+    std::vector<std::shared_ptr<LikelihoodBase<5>>> likelihoods;
+    likelihoods.push_back(std::make_shared<CC<5>>(SRC_DIR / "data/CC"));
+    likelihoods.push_back(std::make_shared<SN1a<5>>(SRC_DIR / "data/SN1a", 4));
 
-    CombinedLikelihood<6, 2> combined_likelihood(likelihoods, range_prior, Model, GetY0, GetH);
+    CombinedLikelihood<5, 2> combined_likelihood(likelihoods, range_prior, Model, GetY0, GetH);
 
     // define initial walker states
-    Vector<6> mu_init;
-    mu_init << 73.0, 0.3, 0.0, 0.7, 0.0, -19.0;
-    Matrix<6> sigma_init;
-    sigma_init << 3.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                  0.0, 0.5, 0.0, 0.0, 0.0, 0.0,
-                  0.0, 0.0, 0.3, 0.0, 0.0, 0.0,
-                  0.0, 0.0, 0.0, 0.3, 0.0, 0.0,
-                  0.0, 0.0, 0.0, 0.0, 0.5, 0.0,
-                  0.0, 0.0, 0.0, 0.0, 0.0, 0.5;
-    Vector<6> z;
+    Vector<5> mu_init;
+    mu_init << 73.0, 0.3, 0.0, 0.0, -19.0;
+    Matrix<5> sigma_init;
+    sigma_init << 2.0, 0.0, 0.0, 0.0, 0.0,
+                  0.0, 0.1, 0.0, 0.0, 0.0,
+                  0.0, 0.0, 0.3, 0.0, 0.0,
+                  0.0, 0.0, 0.0, 0.5, 0.0,
+                  0.0, 0.0, 0.0, 0.0, 0.5;
+    Vector<5> z;
     std::normal_distribution<double> distN01(0.0, 1.0);
     std::mt19937 randgen(314159);
     const unsigned int W = 50;
-    std::array<Vector<6>, W> init_states;
+    std::array<Vector<5>, W> init_states;
     for (unsigned int w = 0; w < W; w++) {
-        z << distN01(randgen), distN01(randgen), distN01(randgen), distN01(randgen), distN01(randgen), distN01(randgen);
+        z << distN01(randgen), distN01(randgen), distN01(randgen), distN01(randgen), distN01(randgen);
         init_states[w] = mu_init + sigma_init * z;
     }
 
     // instantiate MCMC sampler
-    std::function<double(const Vector<6> &)> log_likelihood = [&](const Vector<6> &params)
+    std::function<double(const Vector<5> &)> log_likelihood = [&](const Vector<5> &params)
     {
         return combined_likelihood.log_likelihood(params);
     };
-    MCMC2<6, W> sampler(proc, num_procs, log_likelihood, init_states, 1.5);
+    MCMC2<5, W> sampler(proc, num_procs, log_likelihood, init_states, 1.5);
 
     bool burn_in_done = false;
     // instantiate burn-in monitor
