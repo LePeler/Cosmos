@@ -6,7 +6,7 @@ It provides a flexible framework for both analytical and numerical cosmological 
 
 ---
 
-## 🚀 Features
+## Features
 
 * **MCMC Sampler** – robust and efficient sampling for cosmological parameter estimation.
 * **Chebyshev Method** – fast solver for algebraic models.
@@ -19,7 +19,17 @@ It provides a flexible framework for both analytical and numerical cosmological 
 
 ---
 
-## 📂 Examples
+## Requirements
+
+* **Eigen3** (libeigen3-dev)
+* **OpenMP** (libomp-dev)
+* **MPI** (libopenmpi-dev)
+* **BLAS** (libopenblas-dev)
+* **lapacke** (liblapacke-dev)
+
+---
+
+## Examples
 
 You’ll find three fully worked examples in the `/examples` directory:
 
@@ -33,7 +43,7 @@ There’s also a **Python analysis and plotting script** (requires [`chainconsum
 
 ---
 
-## 🧩 Adding Your Own Models
+## Adding Your Own Models
 
 To add your own models, create a new folder under `/user` and add a `CMakeLists.txt` file there.
 You can register your model’s executable using the provided CMake macro:
@@ -49,11 +59,11 @@ This automatically links your model to the core `cosmos` framework and external 
 
 ---
 
-## ⚙️ Parallel Execution
+## Parallel Execution
 
 `cosmos` supports both **multithreading** (via OpenMP) and **multiprocessing** (via OpenMPI) to take advantage of modern multi-core systems.
 
-### 🧵 OpenMP (Multithreading)
+### OpenMP (Multithreading)
 
 You can control the number of threads by setting the environment variable `OMP_NUM_THREADS` before running the executable:
 
@@ -61,7 +71,7 @@ You can control the number of threads by setting the environment variable `OMP_N
 OMP_NUM_THREADS=6 LCDM_example
 ```
 
-### 🌐 OpenMPI (Multiprocessing)
+### OpenMPI (Multiprocessing)
 
 Run the executable using `mpirun` to launch multiple processes:
 
@@ -73,21 +83,21 @@ Use whichever mode best suits your hardware and workload.
 
 ---
 
-## 📖 Further Reading
+## Further Reading
 
 For detailed discussions on the **mathematical foundations of MCMC**, the **specific algorithms** implemented here, and **performance benchmarks**,
 please refer to **`report.pdf`** (once available).
 
 ---
 
-## 🧠 Notes
+## Notes
 
 * For the **BAO likelihood**, an example implementation of the required `GetRDrag` function can be found in the `LCDM_example` script.
   In practice it was found to only work well for ΛCDM or models with a close ΛCDM limit though.
 
 ---
 
-## 🌌 Happy Experimenting!
+## Happy Experimenting!
 
 We hope `cosmos` helps you explore, test, and refine your cosmological models efficiently and enjoyably.
 
